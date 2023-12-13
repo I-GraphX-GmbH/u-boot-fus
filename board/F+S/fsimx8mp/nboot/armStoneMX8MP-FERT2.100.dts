@@ -31,11 +31,11 @@
 		/* Board Features */
 		//have-nand;
 		have-emmc;
-		have-audio;
+		//have-audio;
 		have-eth-phy-a;
 		have-eth-phy-b;
 		//have-wlan;
-		//have-mipi-dsi;
+		have-mipi-dsi;
 		have-hdmi;
 		have-ext-rtc;
 		//have-security;
