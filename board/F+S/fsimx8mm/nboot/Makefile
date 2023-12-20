@@ -9,7 +9,7 @@ include spl/include/autoconf.mk
 # NBoot version with year and month. Please update for every release. If there
 # needs to be more than one release within a month, add .1, .2, .3, ..., e.g.
 # 2021.03.2 for the third release in March 2021.
-NBOOT_VERSION = 2023.10
+NBOOT_VERSION = 2023.10.1
 
 # List of files to add to BOARD-CONFIGS image. The file name depends on the
 # names given in the Selectsoft WaWi for the board, without the PCB revision.
@@ -28,12 +28,18 @@ BOARD_CONFIGS = \
 	PCoreMX8MM-FERT12.fs \
 	PCoreMX8MM-FERT13.fs \
 	PCoreMX8MM-FERT15.fs \
+	PCoreMX8MM-FERT16.fs \
+	PCoreMX8MM-FERT18.fs \
+	PCoreMX8MM-FERT20.fs \
 	PCoreMX8MMr2-FERT3.fs \
 	PCoreMX8MMr2-FERT4.fs \
 	PCoreMX8MMr2-FERT9.fs \
 	PCoreMX8MMr2-FERT12.fs \
 	PCoreMX8MMr2-FERT13.fs \
 	PCoreMX8MMr2-FERT15.fs \
+	PCoreMX8MMr2-FERT19.fs \
+	PCoreMX8MMr2-FERT20.fs \
+	PCoreMX8MMr2-FERT21.fs \
 	PCoreMX8MX-FERT5.fs \
 	PCoreMX8MX-FERT6.fs \
 	PCoreMX8MX-FERT7.fs \
@@ -50,7 +56,8 @@ RT_LPDDR4 := \
 	lpddr4_k4f8e3s4hd_mgcl_timing.fs \
 	lpddr4_k4f8e304hb_mgcj_timing.fs \
 	lpddr4_k4f6e3s4hm_mgcl_timing.fs \
-	lpddr4_fl4c2001g_d9_timing.fs
+	lpddr4_fl4c2001g_d9_timing.fs \
+	lpddr4_pc_4g3200m2ch2cs_timing.fs
 RT_DDR4 :=
 
 # List of DRAM-TYPES for DRAM-SETTINGS image; only add those that have timings
