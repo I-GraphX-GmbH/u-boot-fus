@@ -546,6 +546,112 @@ void fs_board_late_init_common(const char *serial_name)
 	setup_var("auxcore", var_name, 1);
 #endif
 #endif
+	// ### BEGIN IGX BOOT FLOW ###
+	envvar = env_get("BOOT_RAUC_ENABLED");
+	if (envvar && (strcmp(envvar, "1") || strcmp(envvar, "y") || strcmp(envvar, "yes") || strcmp(envvar, "true"))) {
+
+		//create boot counters if not exist
+		envvar = env_get("BOOT_A_LEFT");
+		if (!envvar || strlen(envvar) == 0) {
+			env_set("BOOT_A_LEFT", "3");
+		}
+		envvar = env_get("BOOT_B_LEFT");
+		if (!envvar || strlen(envvar) == 0) {
+			env_set("BOOT_B_LEFT", "3");
+		}
+
+		//create rootfs values if not exist
+		envvar = env_get("BOOT_A_ROOT");
+		if (!envvar || strlen(envvar) == 0) {
+			env_set("BOOT_A_ROOT", "/dev/mmcblk${mmcdev}p1");
+		}
+		envvar = env_get("BOOT_B_ROOT");
+		if (!envvar || strlen(envvar) == 0) {
+			env_set("BOOT_B_ROOT", "/dev/mmcblk${mmcdev}p2");
+		}
+
+		//create boot values if not exist
+		envvar = env_get("BOOT_A_BOOT");
+		if (!envvar || strlen(envvar) == 0) {
+			run_command("env set BOOT_A_BOOT", "${mmcdev}:1");
+		}
+		envvar = env_get("BOOT_B_BOOT");
+		if (!envvar || strlen(envvar) == 0) {
+			run_command("env set BOOT_B_BOOT", "${mmcdev}:2");
+		}
+
+		//create boot order if not exist
+		envvar = env_get("BOOT_ORDER");
+		// check if boot order contains A and/or B
+		if (envvar && (strstr(envvar, "A") || strstr(envvar, "B"))) {
+			// do nothing
+		} else {
+			// set default boot order
+			env_set("BOOT_ORDER", "A B");
+		}
+
+		
+		envvar = env_get("BOOT_ORDER");
+		const char current_boot = ' ';
+		//iterate over every char in BOOT_ORDER which is A-Z
+		for (int i = 0; i < strlen(envvar); i++) {
+			if (envvar[i] >= 'A' && envvar[i] <= 'Z') {
+				//get boot counter
+				sprintf(var_name, "BOOT_%c_LEFT", envvar[i]);
+				const char *temp = env_get(var_name);
+				//if boot counter is not greater than 0,
+				//remove char from BOOT_ORDER,
+				//also remove next char if it is a space
+				if (temp && atoi(temp) <= 0) {
+					char *new_order = malloc(strlen(envvar) - 1);
+					int j = 0;
+					for (int k = 0; k < strlen(envvar); k++) {
+						if (envvar[k] != envvar[i]) {
+							new_order[j] = envvar[k];
+							j++;
+						} else {
+							if (envvar[k + 1] == ' ') {
+								k++;
+							}
+						}
+					}
+					new_order[j] = '\0';
+					env_set("BOOT_ORDER", new_order);
+					free(new_order);
+				} else {
+					//decrement boot counter
+					int temp_int = atoi(temp);
+					temp_int--;
+					const char *temp_char = malloc(10);
+					sprintf(temp_char, "%d", temp_int);
+					env_set(var_name, temp_char);
+					free(temp_char);
+					//set current boot
+					current_boot = envvar[i];
+					break;
+				}
+			}
+		}
+		env_save();
+		if (current_boot < 'A' || current_boot > 'Z') {
+			//no valid boot found
+			printf("No valid boot found\nAll boot counters are 0\n");
+		}
+		else {
+			//set rootfs
+			sprintf(var_name, "env set rootfs 'root=${BOOT_%s_ROOT} rauc.slot=%s rootwait'", current_boot, current_boot);
+			run_command(var_name, 0);
+
+			//set kernel
+			sprintf(var_name, "env set kernel 'mmc rescan; load mmc ${BOOT_%s_BOOT} . /boot/Image'", current_boot);
+			run_command(var_name, 0);
+
+			//set fdt
+			sprintf(var_name, "env set fdt 'mmc rescan; load mmc ${BOOT_%s_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
+			run_command(var_name, 0);
+		}
+	}
+	// ### END IGX BOOT FLOW ###
 
 }
 #endif /* CONFIG_BOARD_LATE_INIT */
