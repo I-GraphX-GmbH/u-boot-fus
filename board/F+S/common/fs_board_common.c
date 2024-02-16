@@ -336,6 +336,23 @@ static void setup_var(const char *varname, const char *content, int runvar)
 		run_command(content, 0);
 }
 
+// ### BEGIN IGX BOOT FLOW ###
+
+/* we use this so that we can do without the ctype library */
+#define is_digit(c)	((c) >= '0' && (c) <= '9')
+
+static int skip_atoi(const char **s)
+{
+	int i = 0;
+
+	while (is_digit(**s))
+		i = i * 10 + *((*s)++) - '0';
+
+	return i;
+}
+
+// ### END IGX BOOT FLOW ###
+
 /* Show NBoot version and set up all board specific variables */
 void fs_board_late_init_common(const char *serial_name)
 {
