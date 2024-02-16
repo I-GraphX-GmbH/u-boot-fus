@@ -1460,7 +1460,7 @@ else
 addfsheader_target = u-boot.bin
 endif
 uboot.fs:	$(addfsheader_target)
-	$(call cmd,addfsheader,$(FSIMG_OPT))
+	$(call cmd,addfsheader,$(FSIMG_OPT)) 2> /tmp/addfsheader.log
 
 PHONY += nboot
 NBOOT_PATH = board/$(BOARDDIR)/nboot
