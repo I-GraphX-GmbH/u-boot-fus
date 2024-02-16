@@ -619,7 +619,7 @@ void fs_board_late_init_common(const char *serial_name)
 				//if boot counter is not greater than 0,
 				//remove char from BOOT_ORDER,
 				//also remove next char if it is a space
-				if (temp && skip_atoi(&temp) <= 0) {
+				if (simple_strtol(&temp) <= 0) {
 					char *new_order = malloc(strlen(envvar) - 1);
 					int j = 0;
 					for (int k = 0; k < strlen(envvar); k++) {
@@ -637,10 +637,10 @@ void fs_board_late_init_common(const char *serial_name)
 					free(new_order);
 				} else {
 					//decrement boot counter
-					int temp_int = skip_atoi(&temp);
-					temp_int--;
+					long temp_long = simple_strtol(&temp);
+					temp_long--;
 					char *temp_char = malloc(10);
-					sprintf(temp_char, "%d", temp_int);
+					sprintf(temp_char, "%ld", temp_long);
 					env_set(var_name, temp_char);
 					free(temp_char);
 					//set current boot
