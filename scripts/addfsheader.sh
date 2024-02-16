@@ -289,7 +289,7 @@ secure=0
 # We need xxd, check if it is available
 command -v xxd > /dev/null
 if [ $? -ne 0 ]; then
-    echo "Command 'xxd' missing, please install appropriate package"
+    echo "Command 'xxd' missing, please install appropriate package" >&2
     exit 1
 fi
 
@@ -432,7 +432,7 @@ if [ "$secure$do_crc" != "00" ]; then
 
     command -v crc32 > /dev/null
     if [ $? -ne 0 ]; then
-	echo "Command 'crc32' missing, please install appropriate package"
+	echo "Command 'crc32' missing, please install appropriate package" >&2
 	rm "$temp"
 	exit 1
     fi
