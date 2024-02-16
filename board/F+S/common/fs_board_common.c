@@ -655,17 +655,21 @@ void fs_board_late_init_common(const char *serial_name)
 			printf("No valid boot found\nAll boot counters are 0\n");
 		}
 		else {
+
+			char *temp = malloc(105);
 			//set rootfs
-			sprintf(var_name, "env set rootfs 'root=${BOOT_%c_ROOT} rauc.slot=%c rootwait'", current_boot, current_boot);
-			run_command(var_name, 0);
+			sprintf(temp, "env set rootfs 'root=${BOOT_%c_ROOT} rauc.slot=%c rootwait'", current_boot, current_boot);
+			run_command(temp, 0);
 
 			//set kernel
-			sprintf(var_name, "env set kernel 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/Image'", current_boot);
-			run_command(var_name, 0);
+			sprintf(temp, "env set kernel 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/Image'", current_boot);
+			run_command(temp, 0);
 
 			//set fdt
-			sprintf(var_name, "env set fdt 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
-			run_command(var_name, 0);
+			sprintf(temp, "env set fdt 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
+			run_command(temp, 0);
+
+			free(temp);
 		}
 	}
 	// ### END IGX BOOT FLOW ###
