@@ -23,6 +23,7 @@
 #include "fs_mmc_common.h"
 #include <fuse.h>			/* fuse_read() */
 #include <update.h>			/* enum update_action */
+#include <stdlib.h>    /* atoi */
 
 #ifdef CONFIG_FS_BOARD_CFG
 #include "fs_image_common.h"		/* fs_image_*() */
@@ -573,11 +574,11 @@ void fs_board_late_init_common(const char *serial_name)
 		//create boot values if not exist
 		envvar = env_get("BOOT_A_BOOT");
 		if (!envvar || strlen(envvar) == 0) {
-			run_command("env set BOOT_A_BOOT", "${mmcdev}:1");
+			run_command("env set BOOT_A_BOOT ${mmcdev}:1", 0);
 		}
 		envvar = env_get("BOOT_B_BOOT");
 		if (!envvar || strlen(envvar) == 0) {
-			run_command("env set BOOT_B_BOOT", "${mmcdev}:2");
+			run_command("env set BOOT_B_BOOT ${mmcdev}:2", 0);
 		}
 
 		//create boot order if not exist
@@ -592,7 +593,7 @@ void fs_board_late_init_common(const char *serial_name)
 
 		
 		envvar = env_get("BOOT_ORDER");
-		const char current_boot = ' ';
+		char current_boot = ' ';
 		//iterate over every char in BOOT_ORDER which is A-Z
 		for (int i = 0; i < strlen(envvar); i++) {
 			if (envvar[i] >= 'A' && envvar[i] <= 'Z') {
@@ -622,7 +623,7 @@ void fs_board_late_init_common(const char *serial_name)
 					//decrement boot counter
 					int temp_int = atoi(temp);
 					temp_int--;
-					const char *temp_char = malloc(10);
+					char *temp_char = malloc(10);
 					sprintf(temp_char, "%d", temp_int);
 					env_set(var_name, temp_char);
 					free(temp_char);
@@ -639,15 +640,15 @@ void fs_board_late_init_common(const char *serial_name)
 		}
 		else {
 			//set rootfs
-			sprintf(var_name, "env set rootfs 'root=${BOOT_%s_ROOT} rauc.slot=%s rootwait'", current_boot, current_boot);
+			sprintf(var_name, "env set rootfs 'root=${BOOT_%c_ROOT} rauc.slot=%c rootwait'", current_boot, current_boot);
 			run_command(var_name, 0);
 
 			//set kernel
-			sprintf(var_name, "env set kernel 'mmc rescan; load mmc ${BOOT_%s_BOOT} . /boot/Image'", current_boot);
+			sprintf(var_name, "env set kernel 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/Image'", current_boot);
 			run_command(var_name, 0);
 
 			//set fdt
-			sprintf(var_name, "env set fdt 'mmc rescan; load mmc ${BOOT_%s_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
+			sprintf(var_name, "env set fdt 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
 			run_command(var_name, 0);
 		}
 	}
