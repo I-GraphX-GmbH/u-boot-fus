@@ -563,11 +563,11 @@ void fs_board_late_init_common(const char *serial_name)
 		//create rootfs values if not exist
 		envvar = env_get("BOOT_A_ROOT");
 		if (!envvar || strlen(envvar) == 0) {
-			env_set("BOOT_A_ROOT", "/dev/mmcblk${mmcdev}p1");
+			run_command("env set BOOT_A_ROOT /dev/mmcblk${mmcdev}p1", 0);
 		}
 		envvar = env_get("BOOT_B_ROOT");
 		if (!envvar || strlen(envvar) == 0) {
-			env_set("BOOT_B_ROOT", "/dev/mmcblk${mmcdev}p2");
+			run_command("env set BOOT_B_ROOT /dev/mmcblk${mmcdev}p2", 0);
 		}
 
 		//create boot values if not exist
