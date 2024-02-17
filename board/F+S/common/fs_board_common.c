@@ -642,15 +642,15 @@ void fs_board_late_init_common(const char *serial_name)
 
 			char *temp = malloc(105);
 			//set rootfs
-			sprintf(temp, "env set rootfs 'root=${BOOT_%c_ROOT} rauc.slot=%c rootwait'", current_boot, current_boot);
+			sprintf(temp, "env set rootfs root=${BOOT_%c_ROOT} rauc.slot=%c rootwait", current_boot, current_boot);
 			run_command(temp, 0);
 
 			//set kernel
-			sprintf(temp, "env set kernel 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/Image'", current_boot);
+			sprintf(temp, "env set kernel 'mmc rescan; load mmc ${BOOT_%c_BOOT} ${loadaddr} /boot/Image'", current_boot);
 			run_command(temp, 0);
 
 			//set fdt
-			sprintf(temp, "env set fdt 'mmc rescan; load mmc ${BOOT_%c_BOOT} . /boot/${bootfdt}; booti ${loadaddr} - ${fdt_addr}'", current_boot);
+			sprintf(temp, "env set fdt 'mmc rescan; load mmc ${BOOT_%c_BOOT} ${fdtaddr} /boot/${bootfdt}; booti ${loadaddr} - ${fdtaddr}'", current_boot);
 			run_command(temp, 0);
 
 			free(temp);
