@@ -638,6 +638,7 @@ void fs_board_late_init_common(const char *serial_name)
 			printf("No valid boot found\nAll boot counters are 0\n");
 		}
 		else {
+			printf("Valid boot found\nUsing %c\n", current_boot);
 
 			char *temp = malloc(105);
 			//set rootfs
