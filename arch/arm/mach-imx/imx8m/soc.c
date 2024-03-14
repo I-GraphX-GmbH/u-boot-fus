@@ -172,18 +172,20 @@ static struct mm_region imx8m_mem_map[] = {
 #else
 			 PTE_BLOCK_OUTER_SHARE
 #endif
-#ifdef PHYS_SDRAM_2_SIZE
 	}, {
 		/* DRAM2 */
 		.virt = 0x100000000UL,
 		.phys = 0x100000000UL,
+#ifdef PHYS_SDRAM_2_SIZE
 		.size = PHYS_SDRAM_2_SIZE,
+#else
+		.size = 0x0,
+#endif
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 #ifdef CONFIG_IMX_TRUSTY_OS
 			 PTE_BLOCK_INNER_SHARE
 #else
 			 PTE_BLOCK_OUTER_SHARE
-#endif
 #endif
 	}, {
 		/* empty entrie to split table entry 5 if needed when TEEs are used */

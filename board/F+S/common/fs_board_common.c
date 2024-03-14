@@ -195,7 +195,7 @@ const char *fs_board_get_nboot_version(void)
 /* Set RAM size; optee will be subtracted in dram_init() */
 int board_phys_sdram_size(phys_size_t *size)
 {
-	*size = fs_board_get_cfg_info()->dram_size << 20;
+	*size = (phys_size_t)fs_board_get_cfg_info()->dram_size << 20;
 
 	return 0;
 }
