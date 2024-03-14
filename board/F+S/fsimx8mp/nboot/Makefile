@@ -47,11 +47,15 @@ BOARD_CONFIGS = \
 	PCoreMX8MPr2-FERT5.fs \
 	PCoreMX8MPr2-FERT6.fs \
 	PCoreMX8MPr2-FERT7.fs \
+	PCoreMX8MPr2-FERT8.fs \
 	PCoreMX8MPr2-FERT9.fs \
+	PCoreMX8MPr2-FERT10.fs \
+	PCoreMX8MPr2-FERT11.fs \
 	armStoneMX8MP-FERT0.fs \
 	armStoneMX8MP-FERT2.fs \
 	armStoneMX8MP-FERT4.fs \
 	armStoneMX8MP-FERT5.fs \
+	armStoneMX8MP-FERT6.fs \
 	efusMX8MP-FERT3.fs \
 	efusMX8MP-FERT4.fs \
 	efusMX8MP-FERT5.fs \
@@ -62,11 +66,13 @@ BOARD_CONFIGS = \
 # List of DRAM Timings for each DRAM-TYPE
 RT_DDR3L :=
 RT_LPDDR4 := \
+	lpddr4_as_4g1500m2ch2cs_timing.fs \
 	lpddr4_as_2g1600m2ch1cs_timing.fs \
 	lpddr4_as_1g2000m2ch1cs_timing.fs \
 	lpddr4_as_1g1800m2ch1cs_timing.fs \
 	lpddr4_ef_2g1800m2ch1cs_timing.fs \
 	lpddr4_ef_1g2000m2ch1cs_timing.fs \
+	lpddr4_pc_4g1500m2ch2cs_timing.fs \
 	lpddr4_pc_2g1500m2ch1cs_timing.fs \
 	lpddr4_pc_2g1300m2ch1cs_timing.fs \
 	lpddr4_pc_1g1800m2ch1cs_timing.fs \
