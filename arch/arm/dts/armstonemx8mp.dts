@@ -45,19 +45,19 @@
 		reg = <0x0 0x40000000 0 0x80000000>;
 	};
 
-#if 0 //###
-	reg_usb1_host_vbus: regulator-usb1-vbus {
+	reg_usb3_0_host_rst: regulator-usb3_0-rst {
 		compatible = "regulator-fixed";
-		regulator-name = "usb1_host_vbus";
+		regulator-name = "usb3_0_host_rst";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_usb1_pwr>;
+		pinctrl-0 = <&pinctrl_usb3_0_rst>;
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio1 6 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-		regulator-always-on;
+		startup-delay-us = <100>;
+		off-on-delay-us = <12000>;
+		regulator-boot-on;
 	};
-#endif
 };
 
 &eqos {
@@ -485,6 +485,12 @@
 		fsl,pins = <
 //###			MX8MP_IOMUXC_GPIO1_IO12__GPIO1_IO12	0x19
 			MX8MP_IOMUXC_GPIO1_IO12__USB1_OTG_PWR	0x19
+		>;
+	};
+
+	pinctrl_usb3_0_rst: usb0grp-rst {
+		fsl,pins = <
+			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06	0x19
 		>;
 	};
 

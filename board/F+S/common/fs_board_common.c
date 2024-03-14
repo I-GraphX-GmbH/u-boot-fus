@@ -573,6 +573,7 @@ struct boot_dev_name {
 
 const struct boot_dev_name boot_dev_names[] = {
 	{USB_BOOT,  "USB"},
+	{USB2_BOOT, "USB2"},
 	{NAND_BOOT, "NAND"},
 	{MMC1_BOOT, "MMC1"},
 	{MMC2_BOOT, "MMC2"},
@@ -777,6 +778,8 @@ enum boot_device fs_board_get_boot_dev_from_fuses(void)
 	force_alt_usdhc = val & BOOT_CFG_FORCE_ALT_USDHC;
 	alt = (val & BOOT_CFG_ALT_SEL_MASK) >> BOOT_CFG_ALT_SEL_SHIFT;
 	switch ((val & BOOT_CFG_DEVSEL_MASK) >> BOOT_CFG_DEVSEL_SHIFT) {
+	case 0x1: // USB0 / USB1
+		boot_dev = get_boot_device();
 	case 0x2: // eMMC(SD3)
 		boot_dev = MMC3_BOOT;
 		if (force_alt_usdhc)

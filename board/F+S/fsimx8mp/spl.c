@@ -893,6 +893,7 @@ void board_boot_order(u32 *spl_boot_list)
 		spl_boot_list[0] = BOOT_DEVICE_NAND;
 		break;
 	case USB_BOOT:
+	case USB2_BOOT:
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
 		break;
 	default:

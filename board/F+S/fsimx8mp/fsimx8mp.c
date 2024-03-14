@@ -27,6 +27,7 @@
 #include <spl.h>
 #include <asm/mach-imx/dma.h>
 #include <power/pmic.h>
+#include <power/regulator.h>
 #ifdef CONFIG_USB_TCPC
 #include "../common/tcpc.h"
 #endif
@@ -895,21 +896,21 @@ static void dwc3_nxp_usb_phy_init(struct dwc3_device *dwc3)
 #endif
 
 #if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_IMX8M)
-#define USB1_PWR_EN IMX_GPIO_NR(1, 12)
-#define USB1_RESET IMX_GPIO_NR(1, 6)
 int board_usb_init(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	unsigned int board_type = fs_board_get_type();
 	bool tcpc = (port1.i2c_dev != NULL);
 	struct udevice *dev;
+	char dr_mode[32] = "";
 
 	debug("USB%d: %s init.\n", index, (init)?"otg":"host");
 
 	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
 
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
+
 	/* Handle USB_OTG devices */
-	if (!strcmp(dev_read_string(dev, "dr_mode"), "otg")) {
+	if (!strcmp(dr_mode, "otg")) {
 		/* Shutdown the previous configuration */
 		dwc3_uboot_exit(index);
 		imx8m_usb_power(index, false);
@@ -934,7 +935,7 @@ int board_usb_init(int index, enum usb_init_type init)
 	}
 
 	/* Handle USB_DEV devices */
-	if (!strcmp(dev_read_string(dev, "dr_mode"), "peripheral")) {
+	if (!strcmp(dr_mode, "peripheral")) {
 		if (init == USB_INIT_DEVICE)
 			dwc3_device_data.dr_mode = USB_DR_MODE_PERIPHERAL;
 		else
@@ -942,29 +943,16 @@ int board_usb_init(int index, enum usb_init_type init)
 	}
 
 	/* Handle USB_HOST devices */
-	if (!strcmp(dev_read_string(dev, "dr_mode"), "host")) {
+	if (!strcmp(dr_mode, "host")) {
 		if (init == USB_INIT_HOST)
 			dwc3_device_data.dr_mode = USB_DR_MODE_HOST;
-		/* TODO: Move PWR and RST GPIOs to Device-Tree */
-#if 0
-			if(board_type == BT_ARMSTONEMX8MP) {
-				/* Set reset pin to high */
-				gpio_request(USB1_RESET, "usb1_reset");
-				gpio_direction_output(USB1_RESET, 0);
-				udelay(100);
-				gpio_direction_output(USB1_RESET, 1);
-			}
-			/* Enable host power */
-			gpio_request(USB1_PWR_EN, "usb1_pwr");
-			gpio_direction_output(USB1_PWR_EN, 1);
-#endif
 		else
 			return 0;
 	}
 
 	imx8m_usb_power(index, true);
 	dwc3_device_data.index = index;
-	dwc3_device_data.base = (index)?USB2_BASE_ADDR:USB1_BASE_ADDR;
+	dwc3_device_data.base = dev_read_addr(dev);
 	dwc3_nxp_usb_phy_init(&dwc3_device_data);
 	return dwc3_uboot_init(&dwc3_device_data);
 }
@@ -986,15 +974,7 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 			ret = tcpc_disable_src_vbus(&port1);
 #endif
 	}
-	/* Handle USB_HOST devices */
-	if (!strcmp(dev_read_string(dev, "dr_mode"), "host")) {
-	}
-#if 0
-	} else if (index == 0 && init == USB_INIT_HOST) {
-		/* Disable host power */
-		//gpio_direction_output(USB1_PWR_EN, 0);
-	}
-#endif
+
 	dwc3_uboot_exit(index);
 	imx8m_usb_power(index, false);
 
@@ -1024,6 +1004,34 @@ int board_typec_get_mode(int index)
 	}
 }
 #endif
+
+int board_usb_gadget_port_auto(void)
+{
+	unsigned int board_type = fs_board_get_type();
+
+	if (board_type != -1) {
+		switch (board_type)
+		{
+		default:
+		case BT_PICOCOREMX8MP:
+		case BT_PICOCOREMX8MPr2:
+		case BT_ARMSTONEMX8MP:
+		case BT_EFUSMX8MP:
+			return 1;
+		case BT_FSSMMX8MP:
+			return 0;
+		}
+	}
+	else {
+	/* If the board_type is not clear yet
+	 * read the boot device from ROM pointer */
+		if (is_usb_boot())
+			return get_boot_device() - USB_BOOT;
+	}
+
+	/* If we arrive here, we have no valid device */
+	return -1;
+}
 #endif
 
 #ifdef CONFIG_DM_VIDEO
@@ -1039,6 +1047,9 @@ int board_init(void)
 
 	/* Copy NBoot args to variables and prepare command prompt string */
 	fs_board_init_common(&board_info[board_type]);
+
+	/* Activate all regulators defined in the Device-Tree */
+	regulators_enable_boot_on(false);
 
 #ifdef CONFIG_USB_TCPC
 	setup_typec();
