@@ -25,6 +25,7 @@
  *
  * For each transfer (except "Interrupt") we wait for completion.
  */
+
 #include <common.h>
 #include <command.h>
 #include <dm.h>
@@ -43,6 +44,7 @@
 #define USB_BUFSIZ	512
 
 static int asynch_allowed;
+static bool slow_request = false;
 char usb_started; /* flag for the started/stopped USB status */
 #define MAX_PREPARE_RETRIES 3
 
@@ -248,9 +250,13 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 	setup_packet->value = cpu_to_le16(value);
 	setup_packet->index = cpu_to_le16(index);
 	setup_packet->length = cpu_to_le16(size);
+	if (slow_request)
+		udelay(100);
+
 	debug("usb_control_msg: request: 0x%X, requesttype: 0x%X, " \
 	      "value 0x%X index 0x%X length 0x%X\n",
 	      request, requesttype, value, index, size);
+
 	dev->status = USB_ST_NOT_PROC; /*not yet processed */
 
 	err = submit_control_msg(dev, pipe, data, size, setup_packet);
@@ -1223,7 +1229,10 @@ int usb_setup_device(struct usb_device *dev, bool do_read,
 	ret = usb_prepare_device(dev, addr, do_read, parent);
 	if (ret)
 		return ret;
+
+	slow_request = true;
 	ret = usb_select_config(dev);
+	slow_request = false;
 
 	return ret;
 }
