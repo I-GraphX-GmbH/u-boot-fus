@@ -44,7 +44,7 @@
 #define USB_BUFSIZ	512
 
 static int asynch_allowed;
-static bool slow_request = false;
+static char us_between_delays = 0;
 char usb_started; /* flag for the started/stopped USB status */
 #define MAX_PREPARE_RETRIES 3
 
@@ -237,6 +237,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 			void *data, unsigned short size, int timeout)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(struct devrequest, setup_packet, 1);
+	unsigned char retries = 2;
 	int err;
 
 	if ((timeout == 0) && (!asynch_allowed)) {
@@ -244,14 +245,16 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 		return -EINVAL;
 	}
 
+retry:
 	/* set setup command */
 	setup_packet->requesttype = requesttype;
 	setup_packet->request = request;
 	setup_packet->value = cpu_to_le16(value);
 	setup_packet->index = cpu_to_le16(index);
 	setup_packet->length = cpu_to_le16(size);
-	if (slow_request)
-		udelay(100);
+
+	/* optional delay for slow devices */
+	udelay(us_between_delays);
 
 	debug("usb_control_msg: request: 0x%X, requesttype: 0x%X, " \
 	      "value 0x%X index 0x%X length 0x%X\n",
@@ -275,6 +278,27 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 			break;
 		mdelay(1);
 	}
+
+	/*
+	 * KM 2024-04-09: Devices might fail (TX_ERROR) when the time
+	 * between two requests is too short. If this happens, the
+	 * controller will halt, so trigger a reset_ep and retry the
+	 * communication with a delay in between requests.
+	 */
+	if (dev->status == 0x80) {
+		if (retries) {
+			err = submit_control_msg(dev, pipe, data, size, setup_packet);
+			if (err == -EPIPE) {
+				/* Increase delay between requests by 100 us */
+				if (us_between_delays < 200)
+					us_between_delays += 100;
+				retries--;
+				goto retry;
+			}
+		}
+		return -1;
+	}
+
 	if (dev->status)
 		return -1;
 
@@ -1230,9 +1254,7 @@ int usb_setup_device(struct usb_device *dev, bool do_read,
 	if (ret)
 		return ret;
 
-	slow_request = true;
 	ret = usb_select_config(dev);
-	slow_request = false;
 
 	return ret;
 }
