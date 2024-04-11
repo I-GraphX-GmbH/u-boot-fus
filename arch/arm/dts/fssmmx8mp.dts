@@ -1,5 +1,5 @@
 /*
-* Copyright 2019-2021 F&S Elektronik Systeme GmbH
+* Copyright 2024 F&S Elektronik Systeme GmbH
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -45,19 +45,27 @@
 		reg = <0x0 0x40000000 0 0x80000000>;
 	};
 
-#if 0 //###
-	reg_usb1_host_vbus: regulator-usb1-vbus {
+	reg_vlcd_on: regulator-vlcd-on {
 		compatible = "regulator-fixed";
-		regulator-name = "usb1_host_vbus";
+		regulator-name = "vlcd_on";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_usb1_pwr>;
+		pinctrl-0 = <&pinctrl_vlcd_on>;
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		regulator-always-on;
+		gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
 	};
-#endif
+
+	reg_bl_on: regulator-bl-on {
+		compatible = "regulator-fixed";
+		regulator-name = "bl_on";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_bl_on>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio4 3 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+	};
 };
 
 &eqos {
@@ -573,6 +581,18 @@
 			MX8MP_IOMUXC_SD2_CD_B__USDHC2_CD_B			0x196
 			MX8MP_IOMUXC_SD2_WP__USDHC2_WP				0x196
 			MX8MP_IOMUXC_SD2_RESET_B__USDHC2_RESET_B	0x196
+		>;
+	};
+
+	pinctrl_vlcd_on: vlcdgrp-on {
+		fsl,pins = <
+			MX8MP_IOMUXC_SAI1_RXD0__GPIO4_IO02	0x19
+		>;
+	};
+
+	pinctrl_bl_on: blgrp-on {
+		fsl,pins = <
+			MX8MP_IOMUXC_SAI1_RXD1__GPIO4_IO03	0x19
 		>;
 	};
 

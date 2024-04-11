@@ -58,6 +58,28 @@
 		off-on-delay-us = <12000>;
 		regulator-boot-on;
 	};
+
+	reg_vlcd_on: regulator-vlcd-on {
+		compatible = "regulator-fixed";
+		regulator-name = "vlcd_on";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_vlcd_on>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio5 16 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+	};
+
+	reg_bl_on: regulator-bl-on {
+		compatible = "regulator-fixed";
+		regulator-name = "bl_on";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_bl_on>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio4 28 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+	};
 };
 
 &eqos {
@@ -421,8 +443,8 @@
 
 	pinctrl_i2c2: i2c2grp {
 		fsl,pins = <
-			MX8MP_IOMUXC_I2C2_SCL__I2C2_SCL			0x400001c3
-			MX8MP_IOMUXC_I2C2_SDA__I2C2_SDA			0x400001c3
+			MX8MP_IOMUXC_ECSPI1_MISO__I2C2_SCL			0x400001c3
+			MX8MP_IOMUXC_ECSPI1_SS0__I2C2_SDA			0x400001c3
 		>;
 	};
 
@@ -449,8 +471,8 @@
 
 	pinctrl_i2c2_gpio: i2c2grp-gpio {
 		fsl,pins = <
-			MX8MP_IOMUXC_I2C2_SCL__GPIO5_IO16        	0x1c3
-			MX8MP_IOMUXC_I2C2_SDA__GPIO5_IO17        	0x1c3
+			MX8MP_IOMUXC_ECSPI1_MISO__GPIO5_IO08        0x1c3
+			MX8MP_IOMUXC_ECSPI1_SS0__GPIO5_IO09        	0x1c3
 		>;
 	};
 
@@ -582,6 +604,18 @@
 		fsl,pins = <
 			/* CD */
 			MX8MP_IOMUXC_GPIO1_IO14__GPIO1_IO14	0x1c4
+		>;
+	};
+
+	pinctrl_vlcd_on: vlcdgrp-on {
+		fsl,pins = <
+			MX8MP_IOMUXC_I2C2_SCL__GPIO5_IO16	0x19
+		>;
+	};
+
+	pinctrl_bl_on: blgrp-on {
+		fsl,pins = <
+			MX8MP_IOMUXC_SAI3_RXFS__GPIO4_IO28	0x19
 		>;
 	};
 

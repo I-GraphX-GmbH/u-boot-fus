@@ -1077,19 +1077,6 @@ int board_init(void)
 	return 0;
 }
 
-/*TODO: video support is not available for now.
- * first disable bl_on and vlcd_on
- * */
-#define BL_ON_PAD IMX_GPIO_NR(5, 3)
-static iomux_v3_cfg_t const bl_on_pads[] = {
-	MX8MP_PAD_SPDIF_TX__GPIO5_IO03 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-
-#define VLCD_ON_PAD IMX_GPIO_NR(5, 2)
-static iomux_v3_cfg_t const vlcd_on_pads[] = {
-	MX8MP_PAD_SAI3_MCLK__GPIO5_IO02 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-
 int board_late_init(void)
 {
 	/* Set up all board specific variables */
@@ -1097,17 +1084,6 @@ int board_late_init(void)
 
 	/* Set mac addresses for corresponding boards */
 	fs_ethaddr_init();
-
-	/*TODO: video support is not available for now. */
-	imx_iomux_v3_setup_multiple_pads (bl_on_pads, ARRAY_SIZE (bl_on_pads));
-	/* backlight off */
-	gpio_request (BL_ON_PAD, "BL_ON");
-	gpio_direction_output (BL_ON_PAD, 0);
-
-	imx_iomux_v3_setup_multiple_pads (vlcd_on_pads, ARRAY_SIZE (vlcd_on_pads));
-	/* vlcd_on off */
-	gpio_request (VLCD_ON_PAD, "VLCD_ON");
-	gpio_direction_output (VLCD_ON_PAD, 0);
 
 	return 0;
 }
