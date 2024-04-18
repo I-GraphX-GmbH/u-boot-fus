@@ -305,7 +305,11 @@
 	pinctrl-0 = <&pinctrl_usdhc1>, <&pinctrl_usdhc1_gpio>;
 	pinctrl-1 = <&pinctrl_usdhc1_100mhz>, <&pinctrl_usdhc1_gpio>;
 	pinctrl-2 = <&pinctrl_usdhc1_200mhz>, <&pinctrl_usdhc1_gpio>;
+#ifdef CONFIG_NCDU2PCORE_SD_A_CD_HOTFIX
+	cd-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+#else
 	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+#endif
 	vmmc-supply = <&reg_usdhc1_vmmc>;
 	bus-width = <4>;
 	status = "okay";
@@ -525,7 +529,11 @@
 
 	pinctrl_usdhc1_gpio: usdhc1grp-gpio {
 		fsl,pins = <
+#ifdef CONFIG_NCDU2PCORE_SD_A_CD_HOTFIX
+			MX8MP_IOMUXC_GPIO1_IO07__GPIO1_IO07	0x1c4
+#else
 			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06	0x1c4
+#endif
 		>;
 	};
 

@@ -17,6 +17,9 @@
 /* Set board revision as 3-digit number, e.g. 110 for board rev. 1.10 */
 #define CONFIG_PICOCOREMX8MP_BOARD_REVISION	100
 
+/* HOTFIX: ADP-NDCU2PCORE rev 1.00 has SD_A_CD and SD_A_WP flipped */
+//#define CONFIG_NCDU2PCORE_SD_A_CD_HOTFIX
+
  /* Network */
 /* Use FIXED_SPEED and LEGACY_ETH for now */
 #define CONFIG_PICOCOREMX8MP_ETH
