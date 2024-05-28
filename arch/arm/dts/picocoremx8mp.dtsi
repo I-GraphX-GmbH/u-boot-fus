@@ -47,8 +47,7 @@
 		regulator-max-microvolt = <3300000>;
 		gpio = <&gpio2 10 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-		startup-delay-us = <100>;
-		off-on-delay-us = <12000>;
+		regulator-boot-on;
 	};
 
 	reg_vlcd_on: regulator-vlcd-on {
