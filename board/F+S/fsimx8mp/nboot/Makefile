@@ -57,6 +57,8 @@ BOARD_CONFIGS = \
 	armStoneMX8MP-FERT4.fs \
 	armStoneMX8MP-FERT5.fs \
 	armStoneMX8MP-FERT6.fs \
+	armStoneMX8MP-FERT7.fs \
+	armStoneMX8MP-FERT8.fs \
 	efusMX8MP-FERT3.fs \
 	efusMX8MP-FERT4.fs \
 	efusMX8MP-FERT5.fs \
