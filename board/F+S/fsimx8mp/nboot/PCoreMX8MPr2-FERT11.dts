@@ -40,5 +40,6 @@
 		have-ext-rtc;
 		have-security;
 		have-eeprom;
+		is-netdcu;
 	};
 };
