@@ -21,6 +21,7 @@
 #include <asm/arch/sys_proto.h>		/* get_reset_cause() */
 #include "fs_fdt_common.h"		/* Own interface */
 #include "fs_board_common.h"		/* fs_board_get_nboot_args() */
+#include "fs_image_common.h"	/* fs_image_*() */
 
 /* Set a generic value, if it was not already set in the device tree */
 void fs_fdt_set_val(void *fdt, int offs, const char *name, const void *val,
@@ -162,6 +163,16 @@ void fs_fdt_set_bdinfo(void *fdt, int offs)
 	char rev[6];
 	unsigned int board_rev = fs_board_get_rev();
 
+	/* Add board-config to bdinfo node */
+#ifdef CONFIG_FUS_BOARDCFG_ADDR
+	void *fdt_cfg = fs_image_get_cfg_fdt();
+	int offs_cfg = fs_image_get_board_cfg_offs(fdt_cfg);
+	int offs_bdinfo_cfg = fdt_add_subnode(fdt, offs, "board-cfg");
+	fdt_overlay_apply_node(fdt, offs_bdinfo_cfg, fdt_cfg, offs_cfg);
+
+	fs_image_set_board_id_from_cfg();
+	fs_fdt_set_string(fdt, offs, "board-id", fs_image_get_board_id(), 1);
+#endif
 #ifndef CONFIG_FS_BOARD_CFG
 	struct fs_nboot_args *pargs = fs_board_get_nboot_args();
 
