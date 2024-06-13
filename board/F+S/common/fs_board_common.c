@@ -21,6 +21,9 @@
 #include <linux/mtd/rawnand.h>		/* struct mtd_info */
 #include "fs_board_common.h"		/* Own interface */
 #include "fs_mmc_common.h"
+#ifdef CONFIG_FS_SELFTEST
+#include "fs_dram_test.h"
+#endif
 #include <fuse.h>			/* fuse_read() */
 #include <update.h>			/* enum update_action */
 
@@ -37,6 +40,11 @@ static char fs_sys_prompt[32];
 
 /* Store a pointer to the current board info */
 static const struct fs_board_info *current_bi;
+
+#ifdef CONFIG_FS_SELFTEST
+/* Store DRAM test result for bdinfo */
+static char dram_result[64] = "FAILED (Not run)";
+#endif
 
 /* ------------- Functions using fs_nboot_args ----------------------------- */
 
@@ -372,6 +380,11 @@ void fs_board_late_init_common(const char *serial_name)
 		puts(" *** Warning - not compatible with current U-Boot!");
 	putc('\n');
 
+#ifdef CONFIG_FS_SELFTEST
+	/* Save dram_result for bdinfo */
+	fs_test_ram(dram_result);
+#endif
+
 	/* Set sercon variable if not already set */
 	envvar = env_get("sercon");
 	if (!envvar || !strcmp(envvar, "undef")) {
@@ -475,10 +488,17 @@ void fs_board_late_init_common(const char *serial_name)
 	}
 
 	/* Set some variables with a direct value */
+#if defined(CONFIG_FS_SELFTEST)
+	env_set("bootdelay", "0");
+	env_set("updatecheck", "");
+	env_set("installcheck", "");
+	env_set("recovercheck", "");
+#else
 	setup_var("bootdelay", current_bi->bootdelay, 0);
 	setup_var("updatecheck", current_bi->updatecheck, 0);
 	setup_var("installcheck", current_bi->installcheck, 0);
 	setup_var("recovercheck", current_bi->recovercheck, 0);
+#endif
 #ifndef CONFIG_ARCH_MX7ULP
 	setup_var("mtdids", MTDIDS_DEFAULT, 0);
 	setup_var("partition", MTDPART_DEFAULT, 0);
@@ -561,6 +581,14 @@ char *get_sys_prompt(void)
 {
 	return fs_sys_prompt;
 }
+
+#ifdef CONFIG_FS_SELFTEST
+/* Return dram_result for bdinfo */
+char *get_dram_result(void)
+{
+	return dram_result;
+}
+#endif
 
 #endif /* ! CONFIG_SPL_BUILD */
 

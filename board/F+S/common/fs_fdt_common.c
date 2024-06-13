@@ -22,6 +22,9 @@
 #include "fs_fdt_common.h"		/* Own interface */
 #include "fs_board_common.h"		/* fs_board_get_nboot_args() */
 #include "fs_image_common.h"	/* fs_image_*() */
+#ifdef CONFIG_FS_SELFTEST
+#include "fs_processor_info.h"	/* fs_get_processorInfo() */
+#endif
 
 /* Set a generic value, if it was not already set in the device tree */
 void fs_fdt_set_val(void *fdt, int offs, const char *name, const void *val,
@@ -173,6 +176,14 @@ void fs_fdt_set_bdinfo(void *fdt, int offs)
 	fs_image_set_board_id_from_cfg();
 	fs_fdt_set_string(fdt, offs, "board-id", fs_image_get_board_id(), 1);
 #endif
+
+#ifdef CONFIG_FS_SELFTEST
+	char cpu_info[128];
+	fs_get_processorInfo(cpu_info);
+	fs_fdt_set_string(fdt, offs, "cpu_info", cpu_info, 1);
+	fs_fdt_set_string(fdt, offs, "dram_test_result", get_dram_result(), 1);
+#endif
+
 #ifndef CONFIG_FS_BOARD_CFG
 	struct fs_nboot_args *pargs = fs_board_get_nboot_args();
 
