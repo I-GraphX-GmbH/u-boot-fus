@@ -1043,11 +1043,10 @@
 	fsl,phy-pcs-tx-swing-full = <0x7f>;
 	status = "okay";
 };
-#if 0
+
 &usb3_1 {
 	status = "okay";
 };
-#endif
 
 &usb_dwc3_1 {
 	compatible = "fsl,imx8mq-dwc3", "snps,dwc3";
