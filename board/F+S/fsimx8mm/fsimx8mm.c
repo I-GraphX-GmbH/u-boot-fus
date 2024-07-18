@@ -60,6 +60,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BT_PICOCOREMX8MX	1
 #define BT_PICOCOREMX8MMr2	2
 #define BT_TBS2 		3
+#define BT_OSM8MM 		4
 
 /* Board features; these values can be resorted and redefined at will */
 #define FEAT_ETH_A	(1<<0)
@@ -154,6 +155,19 @@ const struct fs_board_info board_info[] = {
 		.name = "TBS2",
 		.bootdelay = "3",
 		.updatecheck = "mmc0,mmc2",
+		.installcheck = INSTALL_DEF,
+		.recovercheck = UPDATE_DEF,
+		.console = ".console_serial",
+		.login = ".login_serial",
+		.mtdparts = ".mtdparts_std",
+		.network = ".network_off",
+		.init = INIT_DEF,
+		.flags = 0,
+	},
+	{	/* 0 (BT_OSM8MM) */
+		.name = "OSM8MM",
+		.bootdelay = "3",
+		.updatecheck = UPDATE_DEF,
 		.installcheck = INSTALL_DEF,
 		.recovercheck = UPDATE_DEF,
 		.console = ".console_serial",
@@ -302,6 +316,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		switch (fs_board_get_boot_dev()) {
 		case NAND_BOOT:
 			return ENVL_NAND;
+		case MMC1_BOOT:
 		case MMC3_BOOT:
 			return ENVL_MMC;
 		default:
@@ -1474,10 +1489,25 @@ int board_phy_config(struct phy_device *phydev)
 		phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x100);
 		break;
 	case BT_PICOCOREMX8MMr2:
-		/* Set LED2 for Link, LED1 for Activity */
+		/* Set LED1 for Link, LED1 for Activity */
 		phy_write(phydev, MDIO_DEVAD_NONE,
 			  MIIM_RTL8211F_PAGE_SELECT, 0xd04);
 		phy_write(phydev, MDIO_DEVAD_NONE, 0x10, 0x8360);
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0x0);
+
+		/* Disable CLKOUT*/
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0xa43);
+		reg = phy_read(phydev, MDIO_DEVAD_NONE, 0x19);
+		reg &= ~(1 << 0);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x19, reg);
+		break;
+	case BT_OSM8MM:
+		/* Set LED2 for Link, LED2 for Activity */
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0xd04);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x10, 0xEC00);
 		phy_write(phydev, MDIO_DEVAD_NONE,
 			  MIIM_RTL8211F_PAGE_SELECT, 0x0);
 

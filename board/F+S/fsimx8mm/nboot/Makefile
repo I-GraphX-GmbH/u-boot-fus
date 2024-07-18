@@ -43,6 +43,7 @@ BOARD_CONFIGS = \
 	PCoreMX8MX-FERT7.fs \
 	PCoreMX8MX-FERT8.fs \
 	PCoreMX8MX-FERT17.fs \
+	OSM8MM-FERT1.fs \
 	TBS2-FERT1.fs \
 	TBS2-FERT3.fs
 
@@ -54,7 +55,8 @@ RT_LPDDR4 := \
 	lpddr4_pc-1g2400m2ch1cs_timing.fs \
 	lpddr4_pc-1g2400m2ch2cs_timing.fs \
 	lpddr4_pc-1g3000m2ch1cs_timing.fs \
-	lpddr4_pc-2g3000m2ch1cs_timing.fs
+	lpddr4_pc-2g3000m2ch1cs_timing.fs \
+	lpddr4_os-1g3000m2ch1cs_timing.fs
 RT_DDR4 :=
 
 # List of DRAM-TYPES for DRAM-SETTINGS image; only add those that have timings

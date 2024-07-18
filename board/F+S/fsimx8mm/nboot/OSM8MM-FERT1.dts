@@ -1,0 +1,41 @@
+/*
+ * Copyright (C) 2024 F&S Elektronik Systeme GmbH
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/dts-v1/;
+
+#include "nboot-info.dtsi"
+
+/ {
+	board-cfg {
+		board-name = "OSM8MM";
+		board-rev = <110>;
+
+		dram-type = "lpddr4";
+		dram-timing = "os-1g3000m2ch1cs";
+		dram-size = <0x400>;		/* In MiB */
+		dram-chips = <1>;
+
+		/* Boot-Device: NAND | MMC1/2/3 | SD1/2/3 */
+		boot-dev = "MMC1";
+		fuse-bankword = <0x00010003>;	/* MSW: Bank, LSW: Fuse-Word */
+		fuse-mask = <0x10007fff>;
+		fuse-value = <0x10002000>;
+
+		/* Common board features */
+		//have-nand;
+		have-emmc;
+		have-sgtl5000;
+		have-eth-phy;
+		//have-wlan;
+		//have-lvds;
+		have-mipi-dsi;
+		//have-security;
+		//have-can;
+		have-eeprom;
+	};
+};

@@ -582,7 +582,7 @@
 	"mtdids=undef\0"						\
 	"mtdparts=undef\0"						\
 	"netdev=eth0\0"							\
-	"mmcdev=" __stringify(CONFIG_SYS_MMC_ENV_DEV) "\0"		\
+	"mmcdev=undef\0"		\
 	".network_off=setenv network\0"					\
 	".network_on=setenv network ip=${ipaddr}:${serverip}"		\
 	":${gatewayip}:${netmask}:${hostname}:${netdev}\0"		\
