@@ -15,6 +15,7 @@
 		board-name = "OSM8MM";
 		board-rev = <110>;
 
+		/* DRAM: 1GB Samsung B.ICDRAM.41 */
 		dram-type = "lpddr4";
 		dram-timing = "os-1g3000m2ch1cs";
 		dram-size = <0x400>;		/* In MiB */
