@@ -75,6 +75,7 @@ RT_LPDDR4 := \
 	lpddr4_as_1g2000m2ch1cs_timing.fs \
 	lpddr4_as_1g1800m2ch1cs_timing.fs \
 	lpddr4_ef_2g1800m2ch1cs_timing.fs \
+	lpddr4_ef_1g1800m2ch1cs_timing.fs \
 	lpddr4_ef_1g2000m2ch1cs_timing.fs \
 	lpddr4_pc_4g1500m2ch2cs_timing.fs \
 	lpddr4_pc_2g1500m2ch1cs_timing.fs \
