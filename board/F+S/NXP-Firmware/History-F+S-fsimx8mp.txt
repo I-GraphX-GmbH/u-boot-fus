@@ -1,6 +1,10 @@
 History of Changes for N-Boot on F&S Boards and Modules
 -------------------------------------------------------
 
+nboot-fsimx8mp-2024.06.1 (22.08.2024)
+-----------------------------------------------
+Supported boards: PicoCoreMX8MP PicoCoreMX8MPr2 armStoneMX8MP efusMX8MP FSSMMX8MP
+
 nboot-fsimx8mp-2024.06 (01.08.2024)
 -----------------------------------------------
 Supported boards: PicoCoreMX8MP PicoCoreMX8MPr2 armStoneMX8MP efusMX8MP FSSMMX8MP

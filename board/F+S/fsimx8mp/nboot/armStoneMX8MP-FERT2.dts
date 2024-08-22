@@ -41,5 +41,9 @@
 		have-ext-rtc;
 		//have-security;
 		//have-eeprom;
+		have-adc;
+		have-can0;
+		have-can1;
+		//have-rs485;
 	};
 };

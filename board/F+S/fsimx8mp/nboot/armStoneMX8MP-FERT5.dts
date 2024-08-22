@@ -29,7 +29,6 @@
 		fuse-value =    <0x10002a00>;
 
 		/* Common board features */
-		board-rev = <100>;
 		//have-nand;
 		have-emmc;
 		//have-audio;
@@ -40,6 +39,19 @@
 		//have-hdmi;
 		have-ext-rtc;
 		//have-security;
-		//have-eeprom;
+		//have-adc;
+		//have-can0;
+		//have-can1;
+		//have-rs485;
+
+		/* Board-revision specific features */
+		armStoneMX8MP-FERT5.100 {
+			board-rev = <100>;
+		};
+
+		armStoneMX8MP-FERT5.110 {
+			board-rev = <110>;
+			have-eeprom;
+		};
 	};
 };
