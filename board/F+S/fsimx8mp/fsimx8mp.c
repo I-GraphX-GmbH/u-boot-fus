@@ -512,16 +512,49 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 	}
 #endif
 
-	/* Disable SGTL5000 if it is not available */
-	if (!(features & FEAT_AUDIO)) {
-		/* disable all sgtl5000 regulators */
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vdda", 0);
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddio", 0);
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddd", 0);
-		/* disable i2c sgtl5000 */
-		fs_fdt_enable(fdt, "sgtl5000", 0);
-		/* disable sgtl5000 platform driver */
-		fs_fdt_enable(fdt, "sound-sgtl5000", 0);
+	switch (fs_board_get_type()) {
+		case BT_ARMSTONEMX8MP:
+			/* Disable Wolfson codecs if they are not available */
+			if (!(features & FEAT_AUDIO)) {
+				/* disable i2c wm8960 */
+				fs_fdt_enable(fdt, "wm8960", 0);
+				/* disable i2c wm8904 */
+				fs_fdt_enable(fdt, "wm8904", 0);
+				/* disable wm8960 platform driver */
+				fs_fdt_enable(fdt, "sound-wm8960", 0);
+				/* disable wm8904 platform driver */
+				fs_fdt_enable(fdt, "sound-wm8904", 0);
+			}
+			else {
+				struct cfg_info *info = fs_board_get_cfg_info();
+				/* Revision 1.00 uses wm8960 */
+				if (info->board_rev == 100) {
+					/* disable i2c wm8904 */
+					fs_fdt_enable(fdt, "wm8904", 0);
+					/* disable wm8904 platform driver */
+					fs_fdt_enable(fdt, "sound-wm8904", 0);
+				}
+				/* Other revisions use wm8904 */
+				else {
+					/* disable i2c wm8960 */
+					fs_fdt_enable(fdt, "wm8960", 0);
+					/* disable wm8960 platform driver */
+					fs_fdt_enable(fdt, "sound-wm8960", 0);
+				}
+			}
+			break;
+		default:
+			/* Disable SGTL5000 if it is not available */
+			if (!(features & FEAT_AUDIO)) {
+				/* disable all sgtl5000 regulators */
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vdda", 0);
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddio", 0);
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddd", 0);
+				/* disable i2c sgtl5000 */
+				fs_fdt_enable(fdt, "sgtl5000", 0);
+				/* disable sgtl5000 platform driver */
+				fs_fdt_enable(fdt, "sound-sgtl5000", 0);
+			}
 	}
 
 	/* The following stuff is only set in Linux device tree */
