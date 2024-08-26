@@ -291,6 +291,10 @@ enum update_action board_check_for_recover(void)
 		}
 	}
 
+	/* Skip check for update when going for fastboot */
+	if (is_boot_from_usb())
+		return UPDATE_ACTION_NONE;
+
 	return UPDATE_ACTION_UPDATE;
 }
 #endif /* CONFIG_CMD_UPDATE */
