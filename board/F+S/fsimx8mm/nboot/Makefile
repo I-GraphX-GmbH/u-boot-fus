@@ -58,7 +58,7 @@ RT_DDR3L := \
 RT_LPDDR4 := \
 	lpddr4_pc_1g3000m2ch1cs_timing.fs \
 	lpddr4_pc_2g3000m2ch1cs_timing.fs \
-	lpddr4_pc_4g3200m2ch2cs_timing.fs \
+	lpddr4_pc_4g3000m2ch2cs_timing.fs \
 	lpddr4_os_1g3000m2ch1cs_timing.fs
 RT_DDR4 :=
 

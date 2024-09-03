@@ -16,7 +16,7 @@
 
 		/* DRAM: 4GB Samsung B.ICDRAM.45 */
 		dram-type = "lpddr4";
-		dram-timing = "lpddr4_pc_4g3200m2ch2cs";
+		dram-timing = "lpddr4_pc_4g3000m2ch2cs";
 		dram-size = <0x1000>;		/* In MiB */
 		dram-chips = <1>;
 
