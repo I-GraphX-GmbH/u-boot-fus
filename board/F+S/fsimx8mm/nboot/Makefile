@@ -30,6 +30,7 @@ BOARD_CONFIGS = \
 	PCoreMX8MM-FERT15.fs \
 	PCoreMX8MM-FERT16.fs \
 	PCoreMX8MM-FERT18.fs \
+	PCoreMX8MM-FERT20.fs \
 	PCoreMX8MM-FERT22.fs \
 	PCoreMX8MMr2-FERT3.fs \
 	PCoreMX8MMr2-FERT4.fs \
@@ -38,6 +39,9 @@ BOARD_CONFIGS = \
 	PCoreMX8MMr2-FERT13.fs \
 	PCoreMX8MMr2-FERT15.fs \
 	PCoreMX8MMr2-FERT18.fs \
+	PCoreMX8MMr2-FERT19.fs \
+	PCoreMX8MMr2-FERT20.fs \
+	PCoreMX8MMr2-FERT21.fs \
 	PCoreMX8MX-FERT5.fs \
 	PCoreMX8MX-FERT6.fs \
 	PCoreMX8MX-FERT7.fs \
@@ -49,12 +53,13 @@ BOARD_CONFIGS = \
 
 # List of DRAM Timings for each DRAM-TYPE
 RT_DDR3L := \
-	ddr3l_pc-512m1600m2ch2cs_timing.fs \
-	ddr3l_pc-1g1600m2ch2cs_timing.fs
+	ddr3l_pc_512m1600m2ch2cs_timing.fs \
+	ddr3l_pc_1g1600m2ch2cs_timing.fs
 RT_LPDDR4 := \
-	lpddr4_pc-1g3000m2ch1cs_timing.fs \
-	lpddr4_pc-2g3000m2ch1cs_timing.fs \
-	lpddr4_os-1g3000m2ch1cs_timing.fs
+	lpddr4_pc_1g3000m2ch1cs_timing.fs \
+	lpddr4_pc_2g3000m2ch1cs_timing.fs \
+	lpddr4_pc_4g3200m2ch2cs_timing.fs \
+	lpddr4_os_1g3000m2ch1cs_timing.fs
 RT_DDR4 :=
 
 # List of DRAM-TYPES for DRAM-SETTINGS image; only add those that have timings
@@ -91,6 +96,10 @@ NBOOT_FILES = $(BOARD)_spl.fs $(BOARD)_board_info.fs \
 # Final NBOOT image
 NBOOT = $(BOARD)_nboot.fs
 
+ifeq ($(BOARD),fsimx8mp)
+DDR_FW_VERSION = _202006
+endif
+
 ifeq ($(BOARD),fsimx8mn)
 NANO = _201810
 endif
@@ -112,12 +121,12 @@ OBJ_NBOOT = $(addprefix $(obj)/, $(NBOOT))
 
 # List of provided firmware files from NXP
 NXP_DDR3L = ddr3_imem_1d.bin ddr3_dmem_1d.bin
-NXP_LPDDR4 = lpddr4_pmu_train_1d_imem.bin lpddr4_pmu_train_1d_dmem.bin \
-	lpddr4_pmu_train_2d_imem.bin lpddr4_pmu_train_2d_dmem.bin
+NXP_LPDDR4 = lpddr4_pmu_train_1d_imem$(DDR_FW_VERSION).bin lpddr4_pmu_train_1d_dmem$(DDR_FW_VERSION).bin \
+	lpddr4_pmu_train_2d_imem$(DDR_FW_VERSION).bin lpddr4_pmu_train_2d_dmem$(DDR_FW_VERSION).bin
 NXP_DDR4 = ddr4_imem_1d$(NANO).bin ddr4_dmem_1d$(NANO).bin \
 	ddr4_imem_2d$(NANO).bin ddr4_dmem_2d$(NANO).bin
 NXP_ATF = bl31-imx8mm.bin
-NXP_TEE = tee-fsimx8mm.bin
+NXP_TEE = tee-imx8mm.bin
 
 # Add path for NXP firmware images
 NXP_PATH = $(srctree)/board/F+S/NXP-Firmware
@@ -181,13 +190,7 @@ $(obj)/.%.bin.tmp: $(obj)/.%.elf.tmp
 quiet_cmd_fsimg = FSIMG   $@
 cmd_fsimg = ${srctree}/scripts/addfsheader.sh -q -a 16 $2 $^ > $@
 
-$(obj)/ddr3l_%_timing.fs: $(obj)/.ddr3l_%_timing.bin.tmp
-	$(call cmd,fsimg,-s -c -p32[7]=$(CONFIG_SPL_ATF_ADDR) -t DRAM-TIMING -d $(*F))
-
-$(obj)/lpddr4_%_timing.fs: $(obj)/.lpddr4_%_timing.bin.tmp
-	$(call cmd,fsimg,-s -c -p32[7]=$(CONFIG_SPL_ATF_ADDR) -t DRAM-TIMING -d $(*F))
-
-$(obj)/ddr4_%_timing.fs: $(obj)/.ddr4_%_timing.bin.tmp
+$(obj)/%_timing.fs: $(obj)/.%_timing.bin.tmp
 	$(call cmd,fsimg,-s -c -p32[7]=$(CONFIG_SPL_ATF_ADDR) -t DRAM-TIMING -d $(*F))
 
 $(obj)/%_fw.fs: $(obj)/.%_fw.tmp

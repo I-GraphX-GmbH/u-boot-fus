@@ -12,12 +12,12 @@
 
 / {
 	board-cfg {
-		board-name = "PicoCoreMX8MM-LPDDR4";
+		board-name = "PicoCoreMX8MMr2-LPDDR4";
 
-		/* DRAM: 2GB Samsung B.ICDRAM.30 */
+		/* DRAM: 4GB Samsung B.ICDRAM.45 */
 		dram-type = "lpddr4";
-		dram-timing = "lpddr4_pc_2g3000m2ch1cs";
-		dram-size = <0x800>;		/* In MiB */
+		dram-timing = "lpddr4_pc_4g3200m2ch2cs";
+		dram-size = <0x1000>;		/* In MiB */
 		dram-chips = <1>;
 
 		/* Boot-Device: NAND | MMC1/2/3 | SD1/2/3 */
@@ -27,12 +27,12 @@
 		fuse-value = <0x10002800>;
 
 		/* Common board features */
-		board-rev = <130>;
+		board-rev = <100>;
 		//have-nand;
 		have-emmc;
 		have-sgtl5000;
 		have-eth-phy;
-		//have-wlan;
+		have-wlan;
 		have-lvds;
 		//have-mipi-dsi;
 		//have-rtc-pcf85063;

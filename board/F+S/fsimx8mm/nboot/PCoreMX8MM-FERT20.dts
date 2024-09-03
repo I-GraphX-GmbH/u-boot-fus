@@ -30,8 +30,8 @@
 		board-rev = <130>;
 		//have-nand;
 		have-emmc;
-		have-sgtl5000;
-		have-eth-phy;
+		//have-sgtl5000;
+		//have-eth-phy;
 		//have-wlan;
 		have-lvds;
 		//have-mipi-dsi;

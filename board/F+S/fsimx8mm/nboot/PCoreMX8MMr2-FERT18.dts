@@ -16,7 +16,7 @@
 
 		/* DRAM: 1GB Foresee B.ICDRAM.36 */
 		dram-type = "lpddr4";
-		dram-timing = "pc-1g3000m2ch1cs";
+		dram-timing = "lpddr4_pc_1g3000m2ch1cs";
 		dram-size = <0x400>;		/* In MiB */
 		dram-chips = <1>;
 
