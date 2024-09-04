@@ -440,6 +440,7 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 	int minc, maxc;
 	int id = 0;
 	__maybe_unused uint32_t temp_range;
+	struct cfg_info *info = fs_board_get_cfg_info();
 
 	/* get CPU temp grade from the fuses */
 	temp_range = get_cpu_temp_grade(&minc, &maxc);
@@ -512,6 +513,7 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 	}
 #endif
 
+	/* Board specific changes */
 	switch (fs_board_get_type()) {
 		case BT_ARMSTONEMX8MP:
 			/* Disable Wolfson codecs if they are not available */
@@ -526,7 +528,6 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 				fs_fdt_enable(fdt, "sound-wm8904", 0);
 			}
 			else {
-				struct cfg_info *info = fs_board_get_cfg_info();
 				/* Revision 1.00 uses wm8960 */
 				if (info->board_rev == 100) {
 					/* disable i2c wm8904 */
@@ -540,6 +541,13 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 					fs_fdt_enable(fdt, "wm8960", 0);
 					/* disable wm8960 platform driver */
 					fs_fdt_enable(fdt, "sound-wm8960", 0);
+				}
+			}
+			if (features & FEAT_ADC) {
+				/* The ADC has i2c address 0x48 on aStone8MP revision 1.00 */
+				if (info->board_rev == 100) {
+					offs = fs_fdt_path_offset(fdt, "adc");
+					fs_fdt_set_u32(fdt, offs, "reg", 0x48, 1);
 				}
 			}
 			break;
@@ -557,6 +565,10 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 			}
 	}
 
+	if (!(features & FEAT_ADC)) {
+		/* Disable ADC if it is not available */
+		fs_fdt_enable(fdt, "adc", 0);
+	}
 	/* The following stuff is only set in Linux device tree */
 	/* Disable RTC85263 if it is not available */
 	if (!(features & FEAT_EXT_RTC)) {
