@@ -33,6 +33,7 @@
 
 #include <asm/sections.h>
 #include <sdp.h>
+#include <linux/delay.h>
 
 #include <asm/mach-imx/boot_mode.h>	/* BOOT_TYPE_* */
 #include "../common/fs_image_common.h"	/* fs_image_*() */
@@ -182,6 +183,10 @@ static void wdog_init(void)
 	set_wdog_reset(wdog);
 }
 
+#define CARRIER_PWR_EN_PAD IMX_GPIO_NR(4, 27)
+static iomux_v3_cfg_t const carrier_pwr_en_pad =
+	IMX8MM_PAD_SAI2_MCLK_GPIO4_IO27 | MUX_PAD_CTRL(NO_PAD_CTRL);
+
 #define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
 
 static iomux_v3_cfg_t const uart_pads_mm[] = {
@@ -199,10 +204,14 @@ static void config_uart(int board_type)
 {
 	switch (board_type)
 	{
+	case BT_OSM8MM:
+		imx_iomux_v3_setup_pad(carrier_pwr_en_pad);
+		gpio_request(CARRIER_PWR_EN_PAD, "CARRIER_PWR_EN");
+		gpio_direction_output(CARRIER_PWR_EN_PAD, 1);
+		mdelay(1);
 	default:
 	case BT_PICOCOREMX8MM:
 	case BT_PICOCOREMX8MMr2:
-	case BT_OSM8MM:
 		/* Setup UART1 on UART1 pads */
 		imx_iomux_v3_setup_multiple_pads(uart_pads_mm,
 						 ARRAY_SIZE(uart_pads_mm));
