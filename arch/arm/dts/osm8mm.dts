@@ -8,6 +8,13 @@
 
 /dts-v1/;
 
+/* Comment this out for OSM module without ADP-OSM-BB */
+#define CONFIG_ADP_OSM_BB
+
+#ifdef CONFIG_ADP_OSM_BB
+#include "osm8mm-adp.dtsi"
+#else
+
 /* Set board revision as 3-digit number, e.g. 110 for board rev. 1.10 */
 #define CONFIG_OSM8MM_BOARD_REVISION	110
 
@@ -16,56 +23,61 @@
 
 /* Display device-trees enables MIPI DSI */
 /* MIPI DSI */
-#define CONFIG_OSM8MM_MIPI_DSI
-
-/*### UBoot deactivates on of the two boot medium NAND/eMMC */
-/* On-board NAND */
-//#define CONFIG_OSM8MM_NAND
-
-/* On-board eMMC */
-#define CONFIG_OSM8MM_EMMC
+//#define CONFIG_OSM8MM_MIPI_DSI
 
 /* Network */
-#define CONFIG_OSM8MM_ETH
-
-/* WLAN/BLUETOOTH; either WLAN-only or combined WLAN/Bluetooth chip */
-//#define CONFIG_OSM8MM_WLAN
+#define CONFIG_OSM8MM_ETH_A
 
 /* USB */
-#define CONFIG_OSM8MM_USB_OTG1
-#define CONFIG_OSM8MM_USB_HOST
+#define CONFIG_OSM8MM_USB_A
+#define CONFIG_OSM8MM_USB_B
+//#define CONFIG_OSM8MM_USB_A_USBC
+/* USB Type-C ALERT signal is available on J2_77 on BBDSI baseboard since
+   Revision 1.40. Otherwise use polling with ~100ms */
+//#define CONFIG_OSM8MM_USB_A_USBC_ALERT
 
 /* PCIe */
-#define CONFIG_OSM8MM_PCIE
+#define CONFIG_OSM8MM_PCIE_A
 
 /* I2C */
-#define CONFIG_OSM8MM_I2C_A
-#define CONFIG_OSM8MM_I2C_B
-#define CONFIG_OSM8MM_I2C_C
-#define CONFIG_OSM8MM_I2C_D
+#define CONFIG_OSM8MM_I2C_A /* OSM: EEPROM BB: I2C_A */
+#define CONFIG_OSM8MM_I2C_B /* ADP: SGTL5000 BB: I2C_D */
+/* OSM: I2C_CAM_PCI ADP: I2C_CAM  BB: I2C_B */
+/* OSM: I2C_CAM_PCI ADP: MPCIE_SM BB: I2C_C */
+#define CONFIG_OSM8MM_I2C_CAM_PCI
 
 /* PWM and backlight brightness */
-#define CONFIG_OSM8MM_PWM
-#define CONFIG_OSM8MM_BL_CTRL
+//#define CONFIG_OSM8MM_BL_CTRL
+#define CONFIG_OSM8MM_PWM_0
+#define CONFIG_OSM8MM_PWM_1
+#define CONFIG_OSM8MM_PWM_2
+#define CONFIG_OSM8MM_PWM_3
 
-/* UART_A - UART1 */
+/* UART_CONN - UART1 */
+#define CONFIG_OSM8MM_UART_CONN
+
+/* UART_A - UART2 */
 #define CONFIG_OSM8MM_UART_A
+#define CONFIG_OSM8MM_UART_A_RTSCTS
 
-/* UART_B - UART2 */
+/* UART_B - UART3 */
 #define CONFIG_OSM8MM_UART_B
 #define CONFIG_OSM8MM_UART_B_RTSCTS
 
-/* UART_D - UART3 */
-#define CONFIG_OSM8MM_UART_D
+/* UART_C - UART4 */
+#define CONFIG_OSM8MM_UART_C
 
+/* FSPI (Single/Dual/Quad) */
 #define CONFIG_OSM8MM_SPI_A
+#define CONFIG_OSM8MM_SPI_A_CS1
+
+/* ECSPI */
+#define CONFIG_OSM8MM_SPI_B
+#define CONFIG_OSM8MM_SPI_B_CS1
 
 
 /* Audio */
-#define CONFIG_OSM8MM_SGTL5000_AUDIO
-
-/* Camera on parallel CSI interface */
-//#define CONFIG_OSM8MM_PARALLEL_CAMERA
+#define CONFIG_OSM8MM_I2S_A
 
 /* Camera on serial MIPI CSI interface */
 #define CONFIG_OSM8MM_SERIAL_CAMERA
@@ -79,19 +91,17 @@
  * On picocoremx8mm SKIT: external port is Micro-SD card slot with CD but
  * without WP
  */
-#define CONFIG_OSM8MM_SD_A
-#define CONFIG_OSM8MM_SD_A_CD
-#define CONFIG_OSM8MM_SD_A_WP
-
+#define CONFIG_OSM8MM_SDIO_A
+#define CONFIG_OSM8MM_SDIO_A_CD
+#define CONFIG_OSM8MM_SDIO_A_WP
 
 /*
  * SD_B - External SD port with Card Detect (CD) and Write Protect (WP)
- * only available if WLAN is not equipped.
  */
-//#define CONFIG_OSM8MM_SD_B
-//#define CONFIG_OSM8MM_SD_B_CD
-//#define CONFIG_OSM8MM_SD_B_WP
-//#define CONFIG_OSM8MM_SD_B_8_BIT
+#define CONFIG_OSM8MM_SDIO_B
+#define CONFIG_OSM8MM_SDIO_B_CD
+#define CONFIG_OSM8MM_SDIO_B_WP
+#define CONFIG_OSM8MM_SDIO_B_8_BIT
 
 /* Check for invalid CONFIG combinations */
 
@@ -118,75 +128,18 @@
 //#undef CONFIG_OSM8MM_SPI_A
 //#undef CONFIG_OSM8MM_SPI_B
 /* Only undef if using audio/sai examples */
-//#undef CONFIG_OSM8MM_I2C_D
-//#undef CONFIG_OSM8MM_SGTL5000_AUDIO
-#endif
-
-/* If WLAN is equipped, SD_B is not available */
-#ifdef CONFIG_OSM8MM_WLAN
-#undef CONFIG_OSM8MM_SD_B
-#undef CONFIG_OSM8MM_SD_B_CD
-#undef CONFIG_OSM8MM_SD_B_WP
+//#undef CONFIG_OSM8MM_I2C_B
+//#undef CONFIG_OSM8MM_I2S_A
 #endif
 
 #include "osm8mm.dtsi"
 
 / {
-	model = "OSM8MM";
+	model = "F&S OSM8MM";
 };
 
 &bdinfo{
 	board_name = "osm8mm";
 };
 
-#ifdef CONFIG_OSM8MM_ETH
-&fec1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_fec1>;
-	phy-mode = "rgmii-id";
-	phy-handle = <&ethphy4>;
-	fsl,magic-packet;
-	status = "okay";
-
-	mdio {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		ethphy4: ethernet-phy@4 {
-			compatible = "ethernet-phy-ieee802.3-c22";
-			reg = <4>;
-			rtl821x,clkout-disable;
-			rtl821x,aldps-enable;
-			rtl821x,ssc-rxc-enable;
-			rtl821x,ssc-sysclk-enable;
-			rtl821x,ssc-clkout-enable;
-			rtl821x,led-link = <2>; // LED1 for link indication
-			rtl821x,led-act = <2>; // LED1 for activity
-			eee-broken-1000t;
-		};
-	};
-};
-
-&iomuxc {
-	imx8mm-osm8mm {
-		pinctrl_fec1: fec1grp {
-			fsl,pins = <
-				MX8MM_IOMUXC_ENET_MDC_ENET1_MDC		0x00003
-				MX8MM_IOMUXC_ENET_MDIO_ENET1_MDIO	0x00003
-				MX8MM_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x0001f
-				MX8MM_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x0001f
-				MX8MM_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x0001f
-				MX8MM_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x0001f
-				MX8MM_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x00091
-				MX8MM_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x00091
-				MX8MM_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x00091
-				MX8MM_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x00091
-				MX8MM_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x0001f
-				MX8MM_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x00091
-				MX8MM_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x00091
-				MX8MM_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x0001f
-			>;
-		};
-	};
-};
-#endif
+#endif /* !CONFIG_ADP_OSM8MM_BB */
