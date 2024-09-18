@@ -19,6 +19,7 @@
 #include <asm/arch/sys_proto.h>		/* is_mx6*() */
 #include <linux/delay.h>
 #include <linux/mtd/rawnand.h>		/* struct mtd_info */
+#include <dm/uclass.h>				/* uclass_get_device() */
 #include "fs_board_common.h"		/* Own interface */
 #include "fs_mmc_common.h"
 #ifdef CONFIG_FS_SELFTEST
@@ -323,6 +324,11 @@ void fs_board_init_common(const struct fs_board_info *board_info)
 
 	/* Prepare the command prompt */
 	sprintf(fs_sys_prompt, "%s # ", board_info->name);
+
+#ifdef CONFIG_IMX_TMU
+	/* Initialize thermal sensor */
+	uclass_get_device(UCLASS_THERMAL, 0, NULL);
+#endif
 }
 
 #ifdef CONFIG_BOARD_LATE_INIT
