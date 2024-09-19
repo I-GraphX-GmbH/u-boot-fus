@@ -117,6 +117,9 @@
 
 
 &usbotg1 {
+	#ifdef CONFIG_OSM8MM_USB_A_USBC
+	extcon = <&ptn5110>;
+	#endif
 	#ifdef CONFIG_USB_OTG_PWR
 	vbus-supply = <&reg_usb_otg_pwr>;
 	#else

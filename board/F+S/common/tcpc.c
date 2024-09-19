@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 NXP
+ * Copyright 2017,2019 NXP
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -231,6 +231,20 @@ int tcpc_clear_alert(struct tcpc_port *port, uint16_t clear_mask)
 	}
 
 	return 0;
+}
+
+int tcpc_fault_status_mask(struct tcpc_port *port, uint8_t fault_mask)
+{
+	int err = 0;
+
+	if (!port)
+		return -EINVAL;
+
+	err = dm_i2c_write(port->i2c_dev, TCPC_FAULT_STATUS_MASK, &fault_mask, 1);
+	if (err)
+		tcpc_log(port, "%s dm_i2c_write failed, err %d\n", __func__, err);
+
+	return err;
 }
 
 int tcpc_send_command(struct tcpc_port *port, uint8_t command)
@@ -551,12 +565,12 @@ static int tcpc_pd_transmit_message(struct tcpc_port *port, struct pd_message *m
 	return ret;
 }
 
-static void tcpc_log_source_caps(struct tcpc_port *port, uint32_t *caps, unsigned int capcount)
+static void tcpc_log_source_caps(struct tcpc_port *port, struct pd_message *msg, unsigned int capcount)
 {
 	int i;
 
 	for (i = 0; i < capcount; i++) {
-		u32 pdo = caps[i];
+		u32 pdo = msg->payload[i];
 		enum pd_pdo_type type = pdo_type(pdo);
 
 		tcpc_log(port, "PDO %d: type %d, ",
@@ -599,7 +613,7 @@ static void tcpc_log_source_caps(struct tcpc_port *port, uint32_t *caps, unsigne
 	}
 }
 
-static int tcpc_pd_select_pdo(uint32_t *caps, uint32_t capcount, uint32_t max_snk_mv, uint32_t max_snk_ma)
+static int tcpc_pd_select_pdo(struct pd_message *msg, uint32_t capcount, uint32_t max_snk_mv, uint32_t max_snk_ma)
 {
 	unsigned int i, max_mw = 0, max_mv = 0;
 	int ret = -EINVAL;
@@ -609,7 +623,7 @@ static int tcpc_pd_select_pdo(uint32_t *caps, uint32_t capcount, uint32_t max_sn
 	 * the board's voltage limits. Prefer PDO providing exp
 	 */
 	for (i = 0; i < capcount; i++) {
-		u32 pdo = caps[i];
+		u32 pdo = msg->payload[i];
 		enum pd_pdo_type type = pdo_type(pdo);
 		unsigned int mv, ma, mw;
 
@@ -639,7 +653,7 @@ static int tcpc_pd_select_pdo(uint32_t *caps, uint32_t capcount, uint32_t max_sn
 }
 
 static int tcpc_pd_build_request(struct tcpc_port *port,
-										uint32_t *caps,
+										struct pd_message *msg,
 										uint32_t capcount,
 										uint32_t max_snk_mv,
 										uint32_t max_snk_ma,
@@ -653,11 +667,11 @@ static int tcpc_pd_build_request(struct tcpc_port *port,
 	int index;
 	u32 pdo;
 
-	index = tcpc_pd_select_pdo(caps, capcount, max_snk_mv, max_snk_ma);
+	index = tcpc_pd_select_pdo(msg, capcount, max_snk_mv, max_snk_ma);
 	if (index < 0)
 		return -EINVAL;
 
-	pdo = caps[index];
+	pdo = msg->payload[index];
 	type = pdo_type(pdo);
 
 	if (type == PDO_TYPE_FIXED)
@@ -726,12 +740,11 @@ static void tcpc_pd_sink_process(struct tcpc_port *port)
 			if (msgtype != PD_DATA_SOURCE_CAP)
 				continue;
 
-			uint32_t *caps = (uint32_t *)&msg.payload;
 			uint32_t rdo = 0;
 
-			tcpc_log_source_caps(port, caps, objcnt);
+			tcpc_log_source_caps(port, &msg, objcnt);
 
-			tcpc_pd_build_request(port, caps, objcnt,
+			tcpc_pd_build_request(port, &msg, objcnt,
 				port->cfg.max_snk_mv, port->cfg.max_snk_ma,
 				port->cfg.max_snk_mw, port->cfg.op_snk_mv,
 				&rdo);
@@ -835,9 +848,18 @@ static int tcpc_pd_sink_disable(struct tcpc_port *port)
 	}
 
 	if ((valb & TCPC_POWER_STATUS_VBUS_PRES) && (valb & TCPC_POWER_STATUS_SINKING_VBUS)) {
-		dm_i2c_read(port->i2c_dev, TCPC_POWER_CTRL, (uint8_t *)&valb, 1);
+		err = dm_i2c_read(port->i2c_dev, TCPC_POWER_CTRL, (uint8_t *)&valb, 1);
+		if (err) {
+			tcpc_log(port, "%s dm_i2c_read failed, err %d\n", __func__, err);
+			return -EIO;
+		}
+
 		valb &= ~TCPC_POWER_CTRL_AUTO_DISCH_DISCO; /* disable AutoDischargeDisconnect */
-		dm_i2c_write(port->i2c_dev, TCPC_POWER_CTRL, (const uint8_t *)&valb, 1);
+		err = dm_i2c_write(port->i2c_dev, TCPC_POWER_CTRL, (const uint8_t *)&valb, 1);
+		if (err) {
+			tcpc_log(port, "%s dm_i2c_write failed, err %d\n", __func__, err);
+			return -EIO;
+		}
 
 		tcpc_disable_sink_vbus(port);
 	}
@@ -896,12 +918,27 @@ static int tcpc_pd_sink_init(struct tcpc_port *port)
 		tcpc_log(port, "TCPC wrong state for dead battery, err = %d, CC = 0x%x\n",
 			err, state);
 		return -EPERM;
-	} else
+	} else {
+		err = tcpc_set_plug_orientation(port, pol);
+		if (err) {
+			tcpc_log(port, "TCPC set plug orientation failed, err = %d\n", err);
+			return err;
+		}
 		port->pd_state = ATTACHED;
+	}
 
-	dm_i2c_read(port->i2c_dev, TCPC_POWER_CTRL, (uint8_t *)&valb, 1);
+	err = dm_i2c_read(port->i2c_dev, TCPC_POWER_CTRL, (uint8_t *)&valb, 1);
+	if (err) {
+		tcpc_log(port, "%s dm_i2c_read failed, err %d\n", __func__, err);
+		return -EIO;
+	}
+
 	valb &= ~TCPC_POWER_CTRL_AUTO_DISCH_DISCO; /* disable AutoDischargeDisconnect */
-	dm_i2c_write(port->i2c_dev, TCPC_POWER_CTRL, (const uint8_t *)&valb, 1);
+	err = dm_i2c_write(port->i2c_dev, TCPC_POWER_CTRL, (const uint8_t *)&valb, 1);
+	if (err) {
+		tcpc_log(port, "%s dm_i2c_write failed, err %d\n", __func__, err);
+		return -EIO;
+	}
 
 	if (port->cfg.switch_setup_func)
 		port->cfg.switch_setup_func(port);
@@ -950,13 +987,13 @@ int tcpc_init(struct tcpc_port *port, struct tcpc_port_config config, ss_mux_sel
 
 	ret = uclass_get_device_by_seq(UCLASS_I2C, port->cfg.i2c_bus, &bus);
 	if (ret) {
-		tcpc_debug_log("%s: Can't find bus\n", __func__);
+		printf("%s: Can't find bus\n", __func__);
 		return -EINVAL;
 	}
 
 	ret = dm_i2c_probe(bus, port->cfg.addr, 0, &i2c_dev);
 	if (ret) {
-		tcpc_debug_log("%s: Can't find device id=0x%x\n",
+		printf("%s: Can't find device id=0x%x\n",
 			__func__, config.addr);
 		return -ENODEV;
 	}
@@ -972,7 +1009,7 @@ int tcpc_init(struct tcpc_port *port, struct tcpc_port_config config, ss_mux_sel
 	}
 
 	dm_i2c_read(port->i2c_dev, TCPC_POWER_STATUS, &valb, 1);
-	tcpc_debug_log("POWER STATUS: 0x%x\n", valb);
+	tcpc_debug_log(port, "POWER STATUS: 0x%x\n", valb);
 
 	/* Clear AllRegistersResetToDefault */
 	valb = 0x80;
@@ -1005,6 +1042,9 @@ int tcpc_init(struct tcpc_port *port, struct tcpc_port_config config, ss_mux_sel
 	} else {
 		tcpc_pd_sink_disable(port);
 	}
+
+	/* Mask all fault status */
+	tcpc_fault_status_mask(port, 0);
 
 	tcpc_clear_alert(port, 0xffff);
 

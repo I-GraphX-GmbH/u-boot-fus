@@ -619,18 +619,6 @@ osm_pcie_a: &pcie0 {};
 	picophy,pre-emp-curr-control = <3>;
 	picophy,dc-vol-level-adjust = <7>;
 	status = "okay";
-#ifdef CONFIG_OSM8MM_USB_A_USBC
-	hnp-disable;
-	srp-disable;
-	adp-disable;
-	usb-role-switch;
-
-	port {
-		usb1_drd_sw: endpoint {
-			remote-endpoint = <&typec1_dr_sw>;
-		};
-	};
-#endif
 };
 #endif
 

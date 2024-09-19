@@ -1107,6 +1107,9 @@ static int setup_typec(void)
 	case BT_PICOCOREMX8MX:
 		port_config.i2c_bus = 0;
 		break;
+	case BT_OSM8MM:
+		port_config.i2c_bus = 2;
+		break;
 	}
 
 	debug("tcpc_init port\n");
@@ -1120,20 +1123,55 @@ static int setup_typec(void)
 int board_usb_init(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	struct udevice *dev;
+	char dr_mode[32] = "";
 
-	debug("board_usb_init %d, type %d\n", index, init);
+	debug("USB%d: %s init.\n", index, (init)?"otg":"host");
 
-	imx8m_usb_power(index, true);
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
 
-	if (index == 0) {
-		if (port.i2c_dev) {
-			if (init == USB_INIT_HOST)
-				tcpc_setup_dfp_mode(port_ptr);
-			else
-				tcpc_setup_ufp_mode(port_ptr);
+	/* We need that return for the fake UDC port */
+	if (ret)
+		return 0;
+
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
+
+	/* Handle USB_OTG devices */
+	if (!strcmp(dr_mode, "otg")) {
+		/* Shutdown the previous configuration */
+		imx8m_usb_power(index, false);
+
+		if (tcpc) {
+#ifdef CONFIG_USB_TCPC
+			/*
+			 * first check upstream facing port (ufp)
+			 * for device
+			 * */
+			ret = tcpc_setup_ufp_mode(&port);
+			if(ret)
+				/*
+				 * second check downstream facing port (dfp)
+				 * for usb host
+				 * */
+				ret = tcpc_setup_dfp_mode(&port);
+#endif
 		}
 	}
+
+	/* Handle USB_DEV devices */
+	if (!strcmp(dr_mode, "peripheral")) {
+		if (init != USB_INIT_DEVICE)
+			return 0;
+	}
+
+	/* Handle USB_HOST devices */
+	if (!strcmp(dr_mode, "host")) {
+		if (init != USB_INIT_HOST)
+			return 0;
+	}
+
+	imx8m_usb_power(index, true);
 
 	return ret;
 }
@@ -1141,18 +1179,25 @@ int board_usb_init(int index, enum usb_init_type init)
 int board_usb_cleanup(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	struct udevice *dev;
 
-	debug("board_usb_cleanup %d, type %d\n", index, init);
+	debug("USB%d: %s cleanup.\n", index, (init)?"otg":"host");
 
-	if (index == 0) {
-		if (port.i2c_dev) {
-			if (init == USB_INIT_HOST)
-				ret = tcpc_disable_src_vbus(port_ptr);
-		}
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
+
+	if (ret)
+		return 0;
+
+	/* Handle USB_OTG devices */
+	if (!strcmp(dev_read_string(dev, "dr_mode"), "otg")) {
+#ifdef CONFIG_USB_TCPC
+		if(tcpc)
+			ret = tcpc_disable_src_vbus(&port);
+#endif
 	}
-
 	imx8m_usb_power(index, false);
+
 	return ret;
 }
 
@@ -1161,24 +1206,36 @@ int board_ehci_usb_phy_mode(struct udevice *dev)
 	int ret = 0;
 	enum typec_cc_polarity pol;
 	enum typec_cc_state state;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	char dr_mode[32] = "";
 
-	if (port.i2c_dev) {
-		if (dev_seq(dev) == 0) {
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
 
-			tcpc_setup_ufp_mode(port_ptr);
+	/* Handle USB_OTG devices */
+	if (!strcmp(dr_mode, "otg")) {
+		if (tcpc) {
+			tcpc_setup_ufp_mode(&port);
 
-			ret = tcpc_get_cc_status(port_ptr, &pol, &state);
+			ret = tcpc_get_cc_status(&port, &pol, &state);
 			if (!ret) {
 				if (state == TYPEC_STATE_SRC_RD_RA || state == TYPEC_STATE_SRC_RD)
 					return USB_INIT_HOST;
 			}
+			return USB_INIT_DEVICE;
 		}
-
-		return USB_INIT_DEVICE;
+		else
+			return USB_INIT_UNKNOWN;
 	}
-	else
-		return USB_INIT_UNKNOWN;
+
+	/* Handle USB_DEV devices */
+	if (!strcmp(dr_mode, "peripheral"))
+		return USB_INIT_DEVICE;
+
+	/* Handle USB_HOST devices */
+	if (!strcmp(dr_mode, "host"))
+		return USB_INIT_HOST;
+
+	return USB_INIT_UNKNOWN;
 }
 #else
 /*

@@ -10,6 +10,8 @@
 
 /* Set board revision as 3-digit number, e.g. 110 for board rev. 1.10 */
 #define CONFIG_OSM8MM_BOARD_REVISION	110
+/* Set baseboard revision as 3-digit number, e.g. 110 for board rev. 1.10 */
+#define CONFIG_PICOCOREBBDSI_BOARD_REVISION	140
 
 /* Activate this if you want to use the Cortex-M4 core */
 //#define SUPPORT_M4
@@ -25,6 +27,7 @@
 #define CONFIG_OSM8MM_USB_A
 #define CONFIG_OSM8MM_USB_B
 #define CONFIG_OSM8MM_USB_A_USBC
+#define CONFIG_OSM8MM_USB_A_USBC_ALERT
 
 /* PCIe */
 #define CONFIG_OSM8MM_PCIE_A
@@ -102,6 +105,16 @@
 /* Only undef if using audio/sai examples */
 //#undef CONFIG_OSM8MM_I2C_B
 //#undef CONFIG_OSM8MM_I2S_A
+#endif
+
+/* Set different settings for corresponding baseboard revision */
+#if CONFIG_PICOCOREBBDSI_BOARD_REVISION < 130
+#undef CONFIG_OSM8MM_USB_A_USBC
+#endif
+
+#if !defined(CONFIG_OSM8MM_USB_A_USBC) \
+    || (CONFIG_PICOCOREBBDSI_BOARD_REVISION < 140)
+#undef CONFIG_OSM8MM_USB_A_USBC_ALERT
 #endif
 
 #include "osm8mm.dtsi"
@@ -208,11 +221,14 @@
 		VDDD-supply = <&reg_sgtl5000_vddd>;
 	};
 
+#ifdef CONFIG_OSM8MM_USB_A_USBC
 	/* USB-C */
 	ptn5110: tcpc@52 {
 		compatible = "nxp,ptn5110";
+#ifdef CONFIG_OSM8MM_USB_A_USBC_ALERT
 		interrupt-parent = <&gpio1>;
-		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+#endif
 		reg = <0x52>;
 		status = "okay";
 
@@ -236,6 +252,7 @@
 			self-powered;
 		};
 	};
+#endif
 };
 
 &osm_i2c_cam_pci {
@@ -294,6 +311,7 @@
 
 &osm_usb_a {
 	dr_mode = "otg";
+#ifdef CONFIG_OSM8MM_USB_A_USBC
 	hnp-disable;
 	srp-disable;
 	adp-disable;
@@ -304,6 +322,7 @@
 			remote-endpoint = <&typec1_dr_sw>;
 		};
 	};
+#endif
 };
 
 &osm_usb_b {
