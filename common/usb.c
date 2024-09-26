@@ -1250,6 +1250,9 @@ int usb_setup_device(struct usb_device *dev, bool do_read,
 	addr = dev->devnum;
 	dev->devnum = 0;
 
+	/* Reset the delay before preparing the new device */
+	us_between_delays = 0;
+
 	ret = usb_prepare_device(dev, addr, do_read, parent);
 	if (ret)
 		return ret;
