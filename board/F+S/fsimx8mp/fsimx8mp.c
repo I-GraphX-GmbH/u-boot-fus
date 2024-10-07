@@ -325,6 +325,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 #ifdef CONFIG_OF_BOARD_SETUP
 #define FDT_LDB_LVDS0	"ldb/lvds-channel@0"
 #define FDT_LDB_LVDS1	"ldb/lvds-channel@1"
+#define FDT_CMA         "/reserved-memory/linux,cma"
 #define FDT_CPU_TEMP_ALERT	"/thermal-zones/cpu-thermal/trips/trip0"
 #define FDT_CPU_TEMP_CRIT	"/thermal-zones/cpu-thermal/trips/trip1"
 #define FDT_SOC_TEMP_ALERT	"/thermal-zones/soc-thermal/trips/trip0"
@@ -629,6 +630,20 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 			fs_fdt_set_macaddr(fdt, offs, id++);
 		if (features & FEAT_ETH_B)
 			fs_fdt_set_macaddr(fdt, offs, id++);
+	}
+
+	/*
+	 * Set linux,cma size depending on RAM size. Keep default (320MB) from
+	 * device tree if <= 1GB, increase to 640MB otherwise.
+	 */
+	if (fs_board_get_cfg_info()->dram_size > 1024)	{
+		fdt32_t tmp[2];
+
+		tmp[0] = cpu_to_fdt32(0x0);
+		tmp[1] = cpu_to_fdt32(0x28000000);
+
+		offs = fs_fdt_path_offset(fdt, FDT_CMA);
+		fs_fdt_set_val(fdt, offs, "size", tmp, sizeof(tmp), 1);
 	}
 
 	/* Sanity check for get_cpu_temp_grade() */

@@ -1687,9 +1687,9 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 
 	/*
 	 * Set linux,cma size depending on RAM size. Keep default (320MB) from
-	 * device tree if < 1GB, increase to 640MB otherwise.
+	 * device tree if <= 1GB, increase to 640MB otherwise.
 	 */
-	if (fs_board_get_cfg_info()->dram_size >= 1023)	{
+	if (fs_board_get_cfg_info()->dram_size > 1024)	{
 		fdt32_t tmp[2];
 
 		tmp[0] = cpu_to_fdt32(0x0);
