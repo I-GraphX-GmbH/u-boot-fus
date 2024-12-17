@@ -432,12 +432,14 @@ static void list_videolink(bool current_only)
 
 	for (index = 0; index < video_links_num; index ++) {
 		match = false;
-		if (curr_video_link == index)
+		if (!video_off && (curr_video_link == index))
 			match = true;
 		else if (current_only)
 			continue;
 
-		printf("[%c]-Video Link %lu", (match)? '*':' ', index);
+		if (!current_only)
+			printf("[%c]-", match ? '*' : ' ');
+		printf("Video Link %lu", index);
 
 		if (match) {
 			struct udevice *video_dev = video_link_get_video_device();
@@ -479,8 +481,9 @@ static int do_videolink(struct cmd_tbl * cmdtp, int flag, int argc, char * const
 int video_link_init(void)
 {
 	struct udevice *dev;
+	const char *env_vl;
 	ulong env_id;
-	int off;
+
 	memset(&video_links, 0, sizeof(video_links));
 	memset(&temp_stack, 0, sizeof(temp_stack));
 
@@ -496,14 +499,16 @@ int video_link_init(void)
 		return -ENODEV;
 	}
 
-	/* Read the env variable for default video link */
-	off = env_get_yesno("video_off");
-	if (off == 1) {
+	printf("Video: ");
+	env_vl = env_get("video_link");
+	if (!env_vl) {
 		video_off = true;
+		printf("off (variable video_link is unset)\n");
 		return 0;
 	}
 
-	env_id = env_get_ulong("video_link", 10, 0);
+	env_id = simple_strtoul(env_vl, NULL, 10);
+
 	if (env_id < video_links_num)
 		curr_video_link = env_id;
 
