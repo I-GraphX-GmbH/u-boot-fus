@@ -32,7 +32,7 @@
 /******************************************************************************/
 
 typedef struct graphic_device {
-    unsigned int isaBase;
+    unsigned long isaBase;
     unsigned int pciBase;
     unsigned int dprBase;
     unsigned int vprBase;
