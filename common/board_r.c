@@ -104,6 +104,13 @@ __weak int cpu_secondary_init_r(void)
 	return 0;
 }
 
+#ifdef CONFIG_DM_VIDEO
+__weak int board_video_init(void)
+{
+	return 0;
+}
+#endif
+
 static int initr_trace(void)
 {
 #ifdef CONFIG_TRACE
@@ -778,6 +785,9 @@ static init_fnc_t init_sequence_r[] = {
 	 * Do pci configuration
 	 */
 	pci_init,
+#endif
+#ifdef CONFIG_DM_VIDEO
+	board_video_init,
 #endif
 	stdio_add_devices,
 	jumptable_init,
