@@ -216,6 +216,7 @@
 		#clock-cells = <0>;
 		clock-frequency = <100000000>;
 	};
+
 };
 
 #ifdef CONFIG_PICOCOREMX8MM_I2C_A
@@ -490,12 +491,6 @@
 &lcdif {
 	status = "okay";
 };
-
-#ifndef CONFIG_PICOCOREMX8MM_MIPI_DSI
-&mipi_dsi {
-	status = "disabled";
-};
-#endif
 
 &mu {
 	status = "okay";

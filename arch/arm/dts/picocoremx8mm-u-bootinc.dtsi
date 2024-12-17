@@ -113,6 +113,94 @@
 		};
 		#endif
 	};
+
+#ifdef CONFIG_PICOCOREMX8MM_MIPI_DSI
+	dsi_host: dsi-host {
+		compatible = "samsung,sec-mipi-dsi";
+		status = "okay";
+	};
+
+	tcxd078iblma-98 {
+		compatible = "xinli,tcxd078iblma-98";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+		reset-gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+		vci-supply = <&reg_vlcd>;
+		dsi-lanes = <4>;
+		video-mode = <0>;	/* 0: burst mode
+					 * 1: non-burst mode with sync event
+					 * 2: non-burst mode with sync pulse
+					 */
+		panel-width-mm = <59>;
+		panel-height-mm = <190>;
+		status = "okay";
+
+		port {
+			tcxd078_from_dsim: endpoint {
+				remote-endpoint = <&dsim_to_tcxd078>;
+			};
+		};
+	};
+
+#if 0
+	/* More displays ### TODO: Make them actually work */
+	panel: simple_panel {
+		compatible = "simple-panel";
+		backlight = <&backlight_ldb>;
+//###		reset-gpios = <&pca963x 3 GPIO_ACTIVE_LOW>;
+//###		enable_gpios = <&pca963x 3 GPIO_ACTIVE_LOW>;
+		data-mapping = "vesa-24";
+		width-mm = <155>;
+		height-mm = <86>;
+		u-boot,dm-pre-reloc;
+		port {
+//###			     panel_from_lvds: endpoint {
+//###				     remote-endpoint = <&lvds_to_panel>;
+			lvds_from_dsim: endpoint { //### muss wieder weg
+				remote-endpoint = <&dsim_to_lvds>; //### muss weg
+			};
+		};
+
+		display-timings {
+			bt070l1060 {
+				clock-frequency = <63000000>;
+				hactive = <1024>;
+				vactive = <600>;
+				hback-porch = <160>;
+				hfront-porch = <76>;
+				hsync-len = <140>;
+				vback-porch = <23>;
+				vfront-porch = <107>;
+				vsync-len = <20>;
+				pixelclk-active = <0>;
+				de-active = <1>;
+			};
+		};
+	};
+
+	rm67199_panel {
+		compatible = "raydium,rm67199";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+		dsi-lanes = <4>;
+		video-mode = <2>;	/* 0: burst mode
+					 * 1: non-burst mode with sync event
+					 * 2: non-burst mode with sync pulse
+					 */
+		panel-width-mm = <68>;
+		panel-height-mm = <121>;
+		status = "okay";
+
+		port {
+			rm67191_from_dsim: endpoint {
+				remote-endpoint = <&dsim_to_rm67191>;
+			};
+		};
+	};
+#endif
+
+#endif /* CONFIG_PICOCOREMX8MM_MIPI_DSI */
 };
 
 
@@ -171,3 +259,91 @@
 	fsl,signal-voltage-switch-extra-delay-ms = <8>;
 	/delete-property/ vqmmc-supply;
 };
+
+&lcdif {
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-parents;
+	/delete-property/ assigned-clock-rates;
+
+	display = <&display0>;
+
+	display0: display@0 {
+		bits-per-pixel = <24>;
+		bus-width = <24>;
+	};
+};
+
+#ifdef CONFIG_PICOCOREMX8MM_MIPI_DSI
+&mipi_dsi {
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-parents;
+	/delete-property/ assigned-clock-rates;
+
+	status = "okay";
+	bus-fmt = <0x100a>;
+	port@1 {
+		reg = <3>;
+		dsim_to_tcxd078: endpoint {
+			remote-endpoint = <&tcxd078_from_dsim>;
+		};
+	};
+
+#if 0
+	/* More displays ### TODO: make them actually work */
+	port@2 {
+		reg = <1>;
+		dsim_to_lvds: endpoint {
+			remote-endpoint = <&lvds_from_dsim>;
+			data-lanes = <0 1 2 3>;
+			attach-bridge;
+		};
+	};
+
+	port@3 {
+		reg = <2>;
+		dsim_to_rm67191: endpoint {
+			remote-endpoint = <&rm67191_from_dsim>;
+		};
+	};
+#endif
+};
+
+#if 0 //###
+&i2c4 {
+	tc358775@f {
+		compatible = "toshiba,tc358775";
+		reg = <0x0f>;
+		pinctrl-names = "default";
+//###		pinctrl-0 = <&pinctrl_mipi_dsi_lvds_en>;
+		vdd-supply = <&reg_vref_1v8>;
+		vddio-supply = <&reg_vref_3v3>;
+
+//###                reset-gpios = <&IMX8MM_LVDS_RESET_GPIO_BANK IMX8MM_LVDS_RESET_GPIO_NUM GPIO_ACTIVE_LOW>;
+#ifdef IMX8MM_LVDS_STBY_GPIO_BANK
+//###                stby-gpios  = <&IMX8MM_LVDS_STBY_GPIO_BANK IMX8MM_LVDS_STBY_GPIO_NUM GPIO_ACTIVE_LOW>;
+#endif
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				lvds_from_dsim: endpoint {
+					remote-endpoint = <&dsim_to_lvds>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				lvds_to_panel: endpoint {
+					remote-endpoint = <&panel_from_lvds>;
+				};
+			};
+		};
+	};
+};
+#endif
+
+#endif /* CONFIG_PICOCOREMX8MM_MIPI_DSI */

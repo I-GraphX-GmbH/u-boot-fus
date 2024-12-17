@@ -23,7 +23,7 @@
 
 /* Display device-trees enables MIPI DSI */
 /* MIPI DSI */
-//#define CONFIG_OSM8MM_MIPI_DSI
+#define CONFIG_OSM8MM_MIPI_DSI
 
 /* Network */
 #define CONFIG_OSM8MM_ETH_A

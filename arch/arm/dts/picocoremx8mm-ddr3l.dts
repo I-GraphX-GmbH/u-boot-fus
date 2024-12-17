@@ -18,7 +18,7 @@
 
 /* Display device-trees enables MIPI DSI */
 /* MIPI DSI */
-//#define CONFIG_PICOCOREMX8MX_MIPI_DSI
+#define CONFIG_PICOCOREMX8MX_MIPI_DSI
 
 /*### UBoot deactivates on of the two boot medium NAND/eMMC */
 /* On-board NAND */

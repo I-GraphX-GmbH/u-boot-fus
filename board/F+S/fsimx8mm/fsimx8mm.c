@@ -40,6 +40,7 @@
 #include <imx_mipi_dsi_bridge.h>
 #include <mipi_dsi_panel.h>
 #include <asm/mach-imx/video.h>
+#include <command.h>			/* run_command() */
 #include <env_internal.h>		/* enum env_operation */
 #include <fdt_support.h>		/* fdt_subnode_offset(), ... */
 #include <hang.h>			/* hang() */
@@ -49,8 +50,11 @@
 #include "../common/fs_eth_common.h"	/* fs_eth_*() */
 #include "../common/fs_image_common.h"	/* fs_image_*() */
 #include <nand.h>
+#include <power/regulator.h>
 #include "sec_mipi_dphy_ln14lpp.h"
 #include "sec_mipi_pll_1432x.h"
+#include <imx_sip.h>
+#include <linux/arm-smccc.h>
 
 /* ------------------------------------------------------------------------- */
 
@@ -468,7 +472,7 @@ void board_nand_init(void)
 }
 #endif
 
-#ifdef CONFIG_VIDEO_MXS
+#if 0 //####ifdef CONFIG_VIDEO_MXS
 /*
  * Possible display configurations
  *
@@ -1068,6 +1072,49 @@ struct display_info_t const displays[] = {
 size_t display_count = ARRAY_SIZE(displays);
 #endif /* CONFIG_VIDEO_MXS */
 
+#ifdef CONFIG_DM_VIDEO
+/* Run variable splashprepare to load bitmap image for splash */
+int splash_screen_prepare(void)
+{
+	char *prep;
+
+	prep = env_get("splashprepare");
+	if (prep)
+		run_command(prep, 0);
+
+	return 0;
+}
+
+#define DISPMIX 9
+#define MIPI 10
+
+int board_video_init(void)
+{
+	struct arm_smccc_res res;
+	struct udevice *vlcd_reg;
+	bool vlcd_inverted;
+
+	/* Start display only if video_link variable is set */
+	if (!env_get("video_link"))
+		return 0;
+
+	/* Start VLCD */
+	vlcd_inverted = (env_get_yesno("vlcd_inverted") > 0);
+	if (regulator_get_by_devname("vlcd", &vlcd_reg) < 0)
+		printf("Cannot find VLCD regulator\n");
+	else
+		regulator_set_enable(vlcd_reg, !vlcd_inverted);
+
+	/* Activate display mix and MIPI domain */
+	arm_smccc_smc(IMX_SIP_GPC, IMX_SIP_GPC_PM_DOMAIN,
+		      DISPMIX, true, 0, 0, 0, 0, &res);
+	arm_smccc_smc(IMX_SIP_GPC, IMX_SIP_GPC_PM_DOMAIN,
+		      MIPI, true, 0, 0, 0, 0, &res);
+
+	return 0;
+}
+#endif /* CONFIG_DM_VIDEO */
+
 /* Return the HW partition where U-Boot environment is on eMMC */
 unsigned int mmc_get_env_part(struct mmc *mmc)
 {
@@ -1301,6 +1348,14 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 #endif
 
 #ifdef CONFIG_BOARD_LATE_INIT
+
+#ifdef CONFIG_DM_VIDEO
+#define BL_PWM_PAD IMX_GPIO_NR(5, 4)
+static iomux_v3_cfg_t const bl_pwm_pads[] = {
+	IMX8MM_PAD_SPDIF_RX_GPIO5_IO4 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+#endif
+
 /*
  * Use this slot to init some final things before the network is started. The
  * F&S configuration heavily depends on this to set up the board specific
@@ -1310,6 +1365,25 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 
 int board_late_init(void)
 {
+#ifdef CONFIG_DM_VIDEO
+	struct udevice *bl_reg;
+
+	/* Start backlight only if video_link variable is set */
+	if (env_get("video_link")) {
+		/* Set-up backlight. ### TODO: Use pwm-backlight instead */
+		if (regulator_get_by_devname("ldb-bl", &bl_reg) < 0)
+			printf("Cannot find backlight regulator\n");
+		else
+			regulator_set_enable(bl_reg, true);
+
+		/* Use PWM-Pad as GPIO, i.e. set full brightness */
+		imx_iomux_v3_setup_multiple_pads(bl_pwm_pads,
+						 ARRAY_SIZE(bl_pwm_pads));
+		gpio_request(BL_PWM_PAD, "BL_PWM");
+		gpio_direction_output(BL_PWM_PAD, 1);
+	}
+#endif
+
 	/* Remove 'fdtcontroladdr' env. because we are using
 	 * compiled-in version. In this case it is not possible
 	 * to use this env. as saved in NAND flash. (s. readme for fdt control)
@@ -1335,7 +1409,7 @@ int board_late_init(void)
 
 	/* Set mac addresses for corresponding boards */
 	fs_ethaddr_init();
-#ifdef CONFIG_VIDEO_MXS
+#if 0 //###ifdef CONFIG_VIDEO_MXS
 	imx_iomux_v3_setup_multiple_pads (bl_on_pads, ARRAY_SIZE (bl_on_pads));
 	/* backlight off */
 	gpio_request (BL_ON_PAD, "BL_ON");
