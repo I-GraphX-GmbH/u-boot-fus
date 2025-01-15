@@ -15,10 +15,10 @@
 		board-name = "OSM8MM";
 		board-rev = <120>;
 
-		/* DRAM: 1GB Samsung B.ICDRAM.41 */
+		/* DRAM: 2GB Samsung B.ICDRAM.30 */
 		dram-type = "lpddr4";
-		dram-timing = "lpddr4_os_1g3000m2ch1cs";
-		dram-size = <0x400>;		/* In MiB */
+		dram-timing = "lpddr4_os_2g3000m2ch1cs";
+		dram-size = <0x800>;		/* In MiB */
 		dram-chips = <1>;
 
 		/* Boot-Device: NAND | MMC1/2/3 | SD1/2/3 */
