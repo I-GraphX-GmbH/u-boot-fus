@@ -172,18 +172,20 @@ static struct mm_region imx8m_mem_map[] = {
 #else
 			 PTE_BLOCK_OUTER_SHARE
 #endif
-#ifdef PHYS_SDRAM_2_SIZE
 	}, {
 		/* DRAM2 */
 		.virt = 0x100000000UL,
 		.phys = 0x100000000UL,
+#ifdef PHYS_SDRAM_2_SIZE
 		.size = PHYS_SDRAM_2_SIZE,
+#else
+		.size = 0x0,
+#endif
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 #ifdef CONFIG_IMX_TRUSTY_OS
 			 PTE_BLOCK_INNER_SHARE
 #else
 			 PTE_BLOCK_OUTER_SHARE
-#endif
 #endif
 	}, {
 		/* empty entrie to split table entry 5 if needed when TEEs are used */
@@ -686,7 +688,11 @@ enum boot_device get_boot_device(void)
 		boot_dev = QSPI_BOOT;
 		break;
 	case BT_DEV_TYPE_USB:
-		boot_dev = USB_BOOT;
+	/* KM-2024-02-06: 8mp begins the USB count at 3 */
+		if(is_imx8mp())
+			boot_dev = boot_instance + USB_BOOT - 3;
+		else /* Tested for 8mn; TODO: 8ulp, imx93*/
+			boot_dev = boot_instance + USB_BOOT;
 		break;
 	default:
 		break;
@@ -721,6 +727,7 @@ bool is_imx8m_running_secondary_boot_image(void)
 		/* Log entries with 1 parameter, skip 1 */
 		case 0x80: /* Start to perform the device initialization */
 		case 0x81: /* The boot device initialization completes */
+		case 0x82: /* Starts to execute boot device driver pre-config*/
 		case 0x8f: /* The boot device initialization fails */
 		case 0x90: /* Start to read data from boot device */
 		case 0x91: /* Reading data from boot device completes */
@@ -747,7 +754,13 @@ bool is_imx8m_running_secondary_boot_image(void)
 
 bool is_usb_boot(void)
 {
-	return get_boot_device() == USB_BOOT;
+	switch (get_boot_device()) {
+		case USB_BOOT:
+		case USB2_BOOT:
+			return 1;
+		default:
+			return 0;
+	}
 }
 #ifdef CONFIG_SERIAL_TAG
 void get_board_serial(struct tag_serialnr *serialnr)
@@ -1291,7 +1304,7 @@ int ft_system_setup(void *blob, struct bd_info *bd)
 	int rc;
 	int nodeoff;
 
-	if (get_boot_device() == USB_BOOT) {
+	if (is_usb_boot()) {
 		disable_dcss_nodes(blob);
 
 		bool new_path = check_fdt_new_path(blob);

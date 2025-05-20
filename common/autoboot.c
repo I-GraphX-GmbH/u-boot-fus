@@ -26,6 +26,9 @@
 #include <update.h>			/* enum update_action */
 #ifdef is_boot_from_usb
 #include <env.h>
+#ifdef CONFIG_FSL_FASTBOOT
+#include <fb_fsl.h>
+#endif
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -362,8 +365,12 @@ const char *bootdelay_process(void)
 				 mfgtools\n", 0);
 	} else if (is_boot_from_usb()) {
 		printf("Boot from USB for uuu\n");
-#ifdef CONFIG_FASTBOOT
-		env_set("bootcmd", "fastboot 0");
+		bootdelay = 0;
+#ifdef CONFIG_FSL_FASTBOOT
+	/* bootcmd needs to be cleared for fastboot_setup */
+		env_set("bootcmd","");
+	/* will determine usb from get_boot_device() */
+		fastboot_setup();
 #endif
 	} else {
 		printf("Normal Boot\n");

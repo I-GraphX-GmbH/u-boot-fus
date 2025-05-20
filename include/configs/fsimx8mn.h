@@ -118,6 +118,8 @@
 
 #define CONFIG_SYS_SERCON_NAME "ttymxc"	/* Base name for serial devices */
 
+#define CONFIG_SYS_BOOTM_LEN		(64 * SZ_1M)
+
 #define CONFIG_SPL_MAX_SIZE		(140 * 1024)
 #define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
@@ -144,7 +146,7 @@
 #define CONFIG_FUS_BOARDCFG_NAND1	0x2c0000
 
 /* Offsets in eMMC where BOARD-CFG and FIRMWARE are stored */
-#define CONFIG_FUS_BOARDCFG_MMC0	0x00040000
+#define CONFIG_FUS_BOARDCFG_MMC0	0x00048000
 #define CONFIG_FUS_BOARDCFG_MMC1	0x00740000
 
 #define CONFIG_SYS_SPL_MALLOC_START	0x42200000
@@ -531,7 +533,7 @@
 	".fdt_nfs=setenv fdt nfs ${fdtaddr}"				\
 	" ${serverip}:${rootpath}/${bootfdt}" BOOT_WITH_FDT		\
 	".rootfs_nfs=setenv rootfs root=/dev/nfs"			\
-	" nfsroot=${serverip}:${rootpath}\0"
+	" nfsroot=${serverip}:${rootpath},tcp,v3\0"
 
 /* Generic settings when not booting with updates A/B */
 #define FS_BOOT_SYSTEM

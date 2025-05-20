@@ -1288,6 +1288,8 @@ static int mxs_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	uint32_t corrected = 0;
 	uint8_t *status;
 	uint32_t status_offs;
+	int chunk_offs;
+	int size;
 	int i, ret;
 
 #ifdef DEBUG
@@ -1414,6 +1416,7 @@ static int mxs_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	ret = 0;
 	for (i = 0; i < chip->ecc.steps + 1; i++) {
 		if (status[i] == 0xfe) {
+			/* Non-correctable chunk */
 			mtd->ecc_stats.failed++;
 			printf("Non-correctable error in page at 0x%08llx\n",
 			       (loff_t)page << chip->page_shift);
@@ -1421,7 +1424,22 @@ static int mxs_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 			/* Note: buf and chip->oob_poi are unchanged here! */
 			return 0;
 		}
-		if ((status[i] != 0x00) && (status[i] != 0xff)) {
+		if (status[i] == 0xff) {
+			/*
+			 * Erased chunk: a few 0-bits are tolerated, but not
+			 * fixed by BCH engine; manually "correct" them by
+			 * using all 0xff; status[0] is for oob data.
+			 */
+			if (i == 0) {
+				size = mtd->oobavail;
+				chunk_offs = mtd->writesize + 4;
+			} else {
+				size = chip->ecc.size;
+				chunk_offs = (i - 1) * size;
+			}
+			memset(data_buf + chunk_offs, 0xff, size);
+		} else {
+			/* Error-free (0x00) or corrected (> 0x00) chunk */
 			corrected += status[i];
 			if (status[i] > ret)
 				ret = status[i];

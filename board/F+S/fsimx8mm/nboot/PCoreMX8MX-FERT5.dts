@@ -14,8 +14,9 @@
 	board-cfg {
 		board-name = "PicoCoreMX8MM-DDR3L";
 
+		/* DRAM: 512MB Samsung B.ICDRAM.34 */
 		dram-type = "ddr3l";
-		dram-timing = "pc-512m1600m2ch2cs";
+		dram-timing = "ddr3l_pc_512m1600m2ch2cs";
 		dram-size = <0x200>;		/* In MiB */
 		dram-chips = <2>;
 

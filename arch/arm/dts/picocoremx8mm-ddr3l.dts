@@ -11,14 +11,14 @@
 /* Set board revision as 3-digit number, e.g. 110 for board rev. 1.10 */
 #define CONFIG_PICOCOREMX8MX_BOARD_REVISION	120
 /* Set baseboard revision as 3-digit number, e.g. 110 for board rev. 1.10 */
-#define CONFIG_PICOCOREBBDSI_BOARD_REVISION	130
+#define CONFIG_PICOCOREBBDSI_BOARD_REVISION	140
 
 /* Activate this if you want to use the Cortex-M4 core */
 //#define SUPPORT_M4
 
 /* Display device-trees enables MIPI DSI */
 /* MIPI DSI */
-//#define CONFIG_PICOCOREMX8MX_MIPI_DSI
+#define CONFIG_PICOCOREMX8MX_MIPI_DSI
 
 /*### UBoot deactivates on of the two boot medium NAND/eMMC */
 /* On-board NAND */

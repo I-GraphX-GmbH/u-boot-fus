@@ -176,12 +176,15 @@ static void fs_setup_cfg_info(void)
 		hang();
 
 	/*
-	 * The flag if running from Primary or Secondary SPL is misusing a
-	 * byte in the BOARD-CFG in OCRAM, so we have to remove this before
-	 * validating the BOARD-CFG.
+	 * The flag if running from Primary or Secondary SPL and UBoot is
+	 * misusing a byte in the BOARD-CFG in OCRAM, so we have to remove this
+	 * before validating the BOARD-CFG.
 	 */
 	if (fs_image_is_secondary())
 		flags |= CI_FLAGS_SECONDARY;
+
+	if (fs_image_is_secondary_uboot())
+		flags |= CI_FLAGS_SECONDARY_UBOOT;
 
 	/* Make sure that the BOARD-CFG in OCRAM is still valid */
 	if (!fs_image_is_ocram_cfg_valid())
@@ -1524,9 +1527,9 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 
 	/*
 	 * Set linux,cma size depending on RAM size. Keep default (320MB) from
-	 * device tree if < 1GB, increase to 640MB otherwise.
+	 * device tree if <= 1GB, increase to 640MB otherwise.
 	 */
-	if (fs_board_get_cfg_info()->dram_size >= 1023)	{
+	if (fs_board_get_cfg_info()->dram_size > 1024)	{
 		fdt32_t tmp[2];
 
 		tmp[0] = cpu_to_fdt32(0x0);

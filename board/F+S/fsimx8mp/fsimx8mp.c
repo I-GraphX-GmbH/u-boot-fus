@@ -27,6 +27,7 @@
 #include <spl.h>
 #include <asm/mach-imx/dma.h>
 #include <power/pmic.h>
+#include <power/regulator.h>
 #ifdef CONFIG_USB_TCPC
 #include "../common/tcpc.h"
 #endif
@@ -49,6 +50,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BT_PICOCOREMX8MPr2 	1
 #define BT_ARMSTONEMX8MP 	2
 #define BT_EFUSMX8MP 		3
+#define BT_FSSMMX8MP 		4
+
 
 #define FEAT_ETH_A 	(1<<0)	/* 0: no LAN0,  1: has LAN0 */
 #define FEAT_ETH_B	(1<<1)	/* 0: no LAN1,  1: has LAN1 */
@@ -145,6 +148,19 @@ const struct fs_board_info board_info[] = {
 		.init = INIT_DEF,
 		.flags = 0,
 	},
+	{	/* 4 (BT_FSSMMX8MP) */
+		.name = "FSSMMX8MP",
+		.bootdelay = "3",
+		.updatecheck = UPDATE_DEF,
+		.installcheck = INSTALL_DEF,
+		.recovercheck = UPDATE_DEF,
+		.console = ".console_serial",
+		.login = ".login_serial",
+		.mtdparts = ".mtdparts_std",
+		.network = ".network_off",
+		.init = INIT_DEF,
+		.flags = 0,
+	},
 };
 
 /* ---- Stage 'f': RAM not valid, variables can *not* be used yet ---------- */
@@ -171,12 +187,15 @@ static void fs_setup_cfg_info(void)
 		hang();
 
 	/*
-	 * The flag if running from Primary or Secondary SPL is misusing a
-	 * byte in the BOARD-CFG in OCRAM, so we have to remove this before
-	 * validating the BOARD-CFG.
+	 * The flag if running from Primary or Secondary SPL and UBoot is
+	 * misusing a byte in the BOARD-CFG in OCRAM, so we have to remove this
+	 * before validating the BOARD-CFG.
 	 */
 	if (fs_image_is_secondary())
 		flags |= CI_FLAGS_SECONDARY;
+
+	if (fs_image_is_secondary_uboot())
+		flags |= CI_FLAGS_SECONDARY_UBOOT;
 
 	/* Make sure that the BOARD-CFG in OCRAM is still valid */
 	if (!fs_image_is_ocram_cfg_valid())
@@ -306,6 +325,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 #ifdef CONFIG_OF_BOARD_SETUP
 #define FDT_LDB_LVDS0	"ldb/lvds-channel@0"
 #define FDT_LDB_LVDS1	"ldb/lvds-channel@1"
+#define FDT_CMA         "/reserved-memory/linux,cma"
 #define FDT_CPU_TEMP_ALERT	"/thermal-zones/cpu-thermal/trips/trip0"
 #define FDT_CPU_TEMP_CRIT	"/thermal-zones/cpu-thermal/trips/trip1"
 #define FDT_SOC_TEMP_ALERT	"/thermal-zones/soc-thermal/trips/trip0"
@@ -336,7 +356,7 @@ static int do_fdt_board_setup_common(void *fdt)
 		case BT_ARMSTONEMX8MP:
 			break;
 		case BT_EFUSMX8MP:
-			/* Disable eeprom node if it is not available */
+			/* Disable adc node if it is not available */
 			if (!(features & FEAT_ADC)) {
 				fs_fdt_enable(fdt, "adc", 0);
 			}
@@ -344,7 +364,7 @@ static int do_fdt_board_setup_common(void *fdt)
 			if (!(features & FEAT_EEPROM)) {
 				fs_fdt_enable(fdt, "eeprom", 0);
 			}
-			/* Disable eeprom node if it is not available */
+			/* Disable sd_b node if it is not available */
 			if (!(features & FEAT_SD_B)) {
 				fs_fdt_enable(fdt, "sd_b", 0);
 			}
@@ -353,6 +373,12 @@ static int do_fdt_board_setup_common(void *fdt)
 				fs_fdt_enable(fdt, "rgb_bridge", 0);
 				/* disable mipi_dsi */
 				fs_fdt_enable(fdt, "mipi_dsi", 0);
+			}
+			break;
+		case BT_FSSMMX8MP:
+			/* Disable eeprom node if it is not available */
+			if (!(features & FEAT_EEPROM)) {
+				fs_fdt_enable(fdt, "eeprom", 0);
 			}
 			break;
 		default:
@@ -415,6 +441,7 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 	int minc, maxc;
 	int id = 0;
 	__maybe_unused uint32_t temp_range;
+	struct cfg_info *info = fs_board_get_cfg_info();
 
 	/* get CPU temp grade from the fuses */
 	temp_range = get_cpu_temp_grade(&minc, &maxc);
@@ -487,18 +514,62 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 	}
 #endif
 
-	/* Disable SGTL5000 if it is not available */
-	if (!(features & FEAT_AUDIO)) {
-		/* disable all sgtl5000 regulators */
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vdda", 0);
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddio", 0);
-		fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddd", 0);
-		/* disable i2c sgtl5000 */
-		fs_fdt_enable(fdt, "sgtl5000", 0);
-		/* disable sgtl5000 platform driver */
-		fs_fdt_enable(fdt, "sound-sgtl5000", 0);
+	/* Board specific changes */
+	switch (fs_board_get_type()) {
+		case BT_ARMSTONEMX8MP:
+			/* Disable Wolfson codecs if they are not available */
+			if (!(features & FEAT_AUDIO)) {
+				/* disable i2c wm8960 */
+				fs_fdt_enable(fdt, "wm8960", 0);
+				/* disable i2c wm8904 */
+				fs_fdt_enable(fdt, "wm8904", 0);
+				/* disable wm8960 platform driver */
+				fs_fdt_enable(fdt, "sound-wm8960", 0);
+				/* disable wm8904 platform driver */
+				fs_fdt_enable(fdt, "sound-wm8904", 0);
+			}
+			else {
+				/* Revision 1.00 uses wm8960 */
+				if (info->board_rev == 100) {
+					/* disable i2c wm8904 */
+					fs_fdt_enable(fdt, "wm8904", 0);
+					/* disable wm8904 platform driver */
+					fs_fdt_enable(fdt, "sound-wm8904", 0);
+				}
+				/* Other revisions use wm8904 */
+				else {
+					/* disable i2c wm8960 */
+					fs_fdt_enable(fdt, "wm8960", 0);
+					/* disable wm8960 platform driver */
+					fs_fdt_enable(fdt, "sound-wm8960", 0);
+				}
+			}
+			if (features & FEAT_ADC) {
+				/* The ADC has i2c address 0x48 on aStone8MP revision 1.00 */
+				if (info->board_rev == 100) {
+					offs = fs_fdt_path_offset(fdt, "adc");
+					fs_fdt_set_u32(fdt, offs, "reg", 0x48, 1);
+				}
+			}
+			break;
+		default:
+			/* Disable SGTL5000 if it is not available */
+			if (!(features & FEAT_AUDIO)) {
+				/* disable all sgtl5000 regulators */
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vdda", 0);
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddio", 0);
+				fs_fdt_enable(fdt, "/regulators/reg_sgtl5000_vddd", 0);
+				/* disable i2c sgtl5000 */
+				fs_fdt_enable(fdt, "sgtl5000", 0);
+				/* disable sgtl5000 platform driver */
+				fs_fdt_enable(fdt, "sound-sgtl5000", 0);
+			}
 	}
 
+	if (!(features & FEAT_ADC)) {
+		/* Disable ADC if it is not available */
+		fs_fdt_enable(fdt, "adc", 0);
+	}
 	/* The following stuff is only set in Linux device tree */
 	/* Disable RTC85263 if it is not available */
 	if (!(features & FEAT_EXT_RTC)) {
@@ -561,6 +632,20 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 			fs_fdt_set_macaddr(fdt, offs, id++);
 	}
 
+	/*
+	 * Set linux,cma size depending on RAM size. Keep default (320MB) from
+	 * device tree if <= 1GB, increase to 640MB otherwise.
+	 */
+	if (fs_board_get_cfg_info()->dram_size > 1024)	{
+		fdt32_t tmp[2];
+
+		tmp[0] = cpu_to_fdt32(0x0);
+		tmp[1] = cpu_to_fdt32(0x28000000);
+
+		offs = fs_fdt_path_offset(fdt, FDT_CMA);
+		fs_fdt_set_val(fdt, offs, "size", tmp, sizeof(tmp), 1);
+	}
+
 	/* Sanity check for get_cpu_temp_grade() */
 	if ((minc > -500) && maxc < 500) {
 		u32 tmp_val;
@@ -596,6 +681,7 @@ void fs_ethaddr_init(void)
 	case BT_PICOCOREMX8MPr2:
 	case BT_ARMSTONEMX8MP:
 	case BT_EFUSMX8MP:
+	case BT_FSSMMX8MP:
 		if (features2 & FEAT_ETH_A) {
 			fs_eth_set_ethaddr(eth_id++);
 		}
@@ -762,6 +848,12 @@ static int setup_typec(void)
 		return ret;
 	}
 
+	/* fssmmx8mp does not support typec */
+	if(board_type == BT_FSSMMX8MP) {
+		port1.i2c_dev = NULL;
+		return ret;
+	}
+
 	imx_iomux_v3_setup_multiple_pads(ss_mux_gpio, ARRAY_SIZE(ss_mux_gpio));
 	gpio_request(USB_TYPEC_SEL, "typec_sel");
 	gpio_request(USB_TYPEC_EN, "typec_en");
@@ -864,31 +956,29 @@ static void dwc3_nxp_usb_phy_init(struct dwc3_device *dwc3)
 #endif
 
 #if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_IMX8M)
-#define USB1_PWR_EN IMX_GPIO_NR(1, 12)
-#define USB1_RESET IMX_GPIO_NR(1, 6)
 int board_usb_init(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	unsigned int board_type = fs_board_get_type();
+	bool tcpc = (port1.i2c_dev != NULL);
+	struct udevice *dev;
+	char dr_mode[32] = "";
 
 	debug("USB%d: %s init.\n", index, (init)?"otg":"host");
 
-	if (index == 0 && init == USB_INIT_DEVICE)
-		/* usb host only */
-		return ret;
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
 
-	imx8m_usb_power(index, true);
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
 
-	if (index == 1 && init == USB_INIT_DEVICE) {
+	/* Handle USB_OTG devices */
+	if (!strcmp(dr_mode, "otg")) {
+		/* Shutdown the previous configuration */
+		dwc3_uboot_exit(index);
+		imx8m_usb_power(index, false);
+		/* OTG devices will always be enabled (Device and Host) */
+		dwc3_device_data.dr_mode = USB_DR_MODE_OTG;
+
+		if (tcpc) {
 #ifdef CONFIG_USB_TCPC
-		if(port1.i2c_dev)
-			tcpc_setup_ufp_mode(&port1);
-#endif
-		dwc3_nxp_usb_phy_init(&dwc3_device_data);
-		return dwc3_uboot_init(&dwc3_device_data);
-	} else if (index == 1 && init == USB_INIT_HOST) {
-#ifdef CONFIG_USB_TCPC
-		if(port1.i2c_dev) {
 			/*
 			 * first check upstream facing port (ufp)
 			 * for device
@@ -900,47 +990,52 @@ int board_usb_init(int index, enum usb_init_type init)
 				 * for usb host
 				 * */
 				ret = tcpc_setup_dfp_mode(&port1);
-		}
 #endif
-		return ret;
-	} else if (index == 0 && init == USB_INIT_HOST) {
-
-		if(board_type == BT_ARMSTONEMX8MP) {
-			/* Set reset pin to high */
-			gpio_request(USB1_RESET, "usb1_reset");
-			gpio_direction_output(USB1_RESET, 0);
-			udelay(100);
-			gpio_direction_output(USB1_RESET, 1);
 		}
-		/* Enable host power */
-		gpio_request(USB1_PWR_EN, "usb1_pwr");
-		gpio_direction_output(USB1_PWR_EN, 1);
 	}
 
-	return ret;
+	/* Handle USB_DEV devices */
+	if (!strcmp(dr_mode, "peripheral")) {
+		if (init == USB_INIT_DEVICE)
+			dwc3_device_data.dr_mode = USB_DR_MODE_PERIPHERAL;
+		else
+			return 0;
+	}
+
+	/* Handle USB_HOST devices */
+	if (!strcmp(dr_mode, "host")) {
+		if (init == USB_INIT_HOST)
+			dwc3_device_data.dr_mode = USB_DR_MODE_HOST;
+		else
+			return 0;
+	}
+
+	imx8m_usb_power(index, true);
+	dwc3_device_data.index = index;
+	dwc3_device_data.base = dev_read_addr(dev);
+	dwc3_nxp_usb_phy_init(&dwc3_device_data);
+	return dwc3_uboot_init(&dwc3_device_data);
 }
 
 int board_usb_cleanup(int index, enum usb_init_type init)
 {
 	int ret = 0;
-
-	if (index == 0 && init == USB_INIT_DEVICE)
-		/* usb host only */
-		return 0;
+	bool tcpc = (port1.i2c_dev != NULL);
+	struct udevice *dev;
 
 	debug("USB%d: %s cleanup.\n", index, (init)?"otg":"host");
-	if (index == 1 && init == USB_INIT_DEVICE) {
-		dwc3_uboot_exit(index);
-	} else if (index == 1 && init == USB_INIT_HOST) {
+
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
+
+	/* Handle USB_OTG devices */
+	if (!strcmp(dev_read_string(dev, "dr_mode"), "otg")) {
 #ifdef CONFIG_USB_TCPC
-		if(port1.i2c_dev)
+		if(tcpc)
 			ret = tcpc_disable_src_vbus(&port1);
 #endif
-	} else if (index == 0 && init == USB_INIT_HOST) {
-		/* Disable host power */
-		gpio_direction_output(USB1_PWR_EN, 0);
 	}
 
+	dwc3_uboot_exit(index);
 	imx8m_usb_power(index, false);
 
 	return ret;
@@ -969,6 +1064,34 @@ int board_typec_get_mode(int index)
 	}
 }
 #endif
+
+int board_usb_gadget_port_auto(void)
+{
+	unsigned int board_type = fs_board_get_type();
+
+	if (board_type != -1) {
+		switch (board_type)
+		{
+		default:
+		case BT_PICOCOREMX8MP:
+		case BT_PICOCOREMX8MPr2:
+		case BT_ARMSTONEMX8MP:
+		case BT_EFUSMX8MP:
+			return 1;
+		case BT_FSSMMX8MP:
+			return 0;
+		}
+	}
+	else {
+	/* If the board_type is not clear yet
+	 * read the boot device from ROM pointer */
+		if (is_usb_boot())
+			return get_boot_device() - USB_BOOT;
+	}
+
+	/* If we arrive here, we have no valid device */
+	return -1;
+}
 #endif
 
 #ifdef CONFIG_DM_VIDEO
@@ -984,6 +1107,9 @@ int board_init(void)
 
 	/* Copy NBoot args to variables and prepare command prompt string */
 	fs_board_init_common(&board_info[board_type]);
+
+	/* Activate all regulators defined in the Device-Tree */
+	regulators_enable_boot_on(false);
 
 #ifdef CONFIG_USB_TCPC
 	setup_typec();
@@ -1011,19 +1137,6 @@ int board_init(void)
 	return 0;
 }
 
-/*TODO: video support is not available for now.
- * first disable bl_on and vlcd_on
- * */
-#define BL_ON_PAD IMX_GPIO_NR(5, 3)
-static iomux_v3_cfg_t const bl_on_pads[] = {
-	MX8MP_PAD_SPDIF_TX__GPIO5_IO03 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-
-#define VLCD_ON_PAD IMX_GPIO_NR(5, 2)
-static iomux_v3_cfg_t const vlcd_on_pads[] = {
-	MX8MP_PAD_SAI3_MCLK__GPIO5_IO02 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-
 int board_late_init(void)
 {
 	/* Set up all board specific variables */
@@ -1031,17 +1144,6 @@ int board_late_init(void)
 
 	/* Set mac addresses for corresponding boards */
 	fs_ethaddr_init();
-
-	/*TODO: video support is not available for now. */
-	imx_iomux_v3_setup_multiple_pads (bl_on_pads, ARRAY_SIZE (bl_on_pads));
-	/* backlight off */
-	gpio_request (BL_ON_PAD, "BL_ON");
-	gpio_direction_output (BL_ON_PAD, 0);
-
-	imx_iomux_v3_setup_multiple_pads (vlcd_on_pads, ARRAY_SIZE (vlcd_on_pads));
-	/* vlcd_on off */
-	gpio_request (VLCD_ON_PAD, "VLCD_ON");
-	gpio_direction_output (VLCD_ON_PAD, 0);
 
 	return 0;
 }
@@ -1069,6 +1171,7 @@ ulong board_serial_base(void)
 	case BT_PICOCOREMX8MP:
 	case BT_PICOCOREMX8MPr2:
 	case BT_ARMSTONEMX8MP:
+	case BT_FSSMMX8MP:
 	default:
 		break;
 	}

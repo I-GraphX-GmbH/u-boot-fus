@@ -16,7 +16,7 @@
 
 		/* DRAM: 1GB Samsung B.ICDRAM.41 */
 		dram-type = "lpddr4";
-		dram-timing = "lpddr4_as_1g2000m2ch1cs";
+		dram-timing = "lpddr4_as_1g1800m2ch1cs";
 		dram-size = <0x400>;		/* In MiB */
 		dram-chips = <1>;
 
@@ -32,14 +32,18 @@
 		board-rev = <100>;
 		//have-nand;
 		have-emmc;
-		have-audio;
+		//have-audio;
 		have-eth-phy-a;
 		have-eth-phy-b;
 		//have-wlan;
-		//have-mipi-dsi;
+		have-mipi-dsi;
 		have-hdmi;
 		have-ext-rtc;
 		//have-security;
 		//have-eeprom;
+		have-adc;
+		have-can0;
+		have-can1;
+		//have-rs485;
 	};
 };

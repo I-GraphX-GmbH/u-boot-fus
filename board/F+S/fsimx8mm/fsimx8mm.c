@@ -40,6 +40,7 @@
 #include <imx_mipi_dsi_bridge.h>
 #include <mipi_dsi_panel.h>
 #include <asm/mach-imx/video.h>
+#include <command.h>			/* run_command() */
 #include <env_internal.h>		/* enum env_operation */
 #include <fdt_support.h>		/* fdt_subnode_offset(), ... */
 #include <hang.h>			/* hang() */
@@ -49,8 +50,11 @@
 #include "../common/fs_eth_common.h"	/* fs_eth_*() */
 #include "../common/fs_image_common.h"	/* fs_image_*() */
 #include <nand.h>
+#include <power/regulator.h>
 #include "sec_mipi_dphy_ln14lpp.h"
 #include "sec_mipi_pll_1432x.h"
+#include <imx_sip.h>
+#include <linux/arm-smccc.h>
 
 /* ------------------------------------------------------------------------- */
 
@@ -60,6 +64,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BT_PICOCOREMX8MX	1
 #define BT_PICOCOREMX8MMr2	2
 #define BT_TBS2 		3
+#define BT_OSM8MM 		4
 
 /* Board features; these values can be resorted and redefined at will */
 #define FEAT_ETH_A	(1<<0)
@@ -154,6 +159,19 @@ const struct fs_board_info board_info[] = {
 		.name = "TBS2",
 		.bootdelay = "3",
 		.updatecheck = "mmc0,mmc2",
+		.installcheck = INSTALL_DEF,
+		.recovercheck = UPDATE_DEF,
+		.console = ".console_serial",
+		.login = ".login_serial",
+		.mtdparts = ".mtdparts_std",
+		.network = ".network_off",
+		.init = INIT_DEF,
+		.flags = 0,
+	},
+	{	/* 0 (BT_OSM8MM) */
+		.name = "OSM8MM",
+		.bootdelay = "3",
+		.updatecheck = UPDATE_DEF,
 		.installcheck = INSTALL_DEF,
 		.recovercheck = UPDATE_DEF,
 		.console = ".console_serial",
@@ -302,6 +320,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		switch (fs_board_get_boot_dev()) {
 		case NAND_BOOT:
 			return ENVL_NAND;
+		case MMC1_BOOT:
 		case MMC3_BOOT:
 			return ENVL_MMC;
 		default:
@@ -453,7 +472,7 @@ void board_nand_init(void)
 }
 #endif
 
-#ifdef CONFIG_VIDEO_MXS
+#if 0 //####ifdef CONFIG_VIDEO_MXS
 /*
  * Possible display configurations
  *
@@ -1053,6 +1072,49 @@ struct display_info_t const displays[] = {
 size_t display_count = ARRAY_SIZE(displays);
 #endif /* CONFIG_VIDEO_MXS */
 
+#ifdef CONFIG_DM_VIDEO
+/* Run variable splashprepare to load bitmap image for splash */
+int splash_screen_prepare(void)
+{
+	char *prep;
+
+	prep = env_get("splashprepare");
+	if (prep)
+		run_command(prep, 0);
+
+	return 0;
+}
+
+#define DISPMIX 9
+#define MIPI 10
+
+int board_video_init(void)
+{
+	struct arm_smccc_res res;
+	struct udevice *vlcd_reg;
+	bool vlcd_inverted;
+
+	/* Start display only if video_link variable is set */
+	if (!env_get("video_link"))
+		return 0;
+
+	/* Start VLCD */
+	vlcd_inverted = (env_get_yesno("vlcd_inverted") > 0);
+	if (regulator_get_by_devname("vlcd", &vlcd_reg) < 0)
+		printf("Cannot find VLCD regulator\n");
+	else
+		regulator_set_enable(vlcd_reg, !vlcd_inverted);
+
+	/* Activate display mix and MIPI domain */
+	arm_smccc_smc(IMX_SIP_GPC, IMX_SIP_GPC_PM_DOMAIN,
+		      DISPMIX, true, 0, 0, 0, 0, &res);
+	arm_smccc_smc(IMX_SIP_GPC, IMX_SIP_GPC_PM_DOMAIN,
+		      MIPI, true, 0, 0, 0, 0, &res);
+
+	return 0;
+}
+#endif /* CONFIG_DM_VIDEO */
+
 /* Return the HW partition where U-Boot environment is on eMMC */
 unsigned int mmc_get_env_part(struct mmc *mmc)
 {
@@ -1092,6 +1154,9 @@ static int setup_typec(void)
 	case BT_PICOCOREMX8MX:
 		port_config.i2c_bus = 0;
 		break;
+	case BT_OSM8MM:
+		port_config.i2c_bus = 2;
+		break;
 	}
 
 	debug("tcpc_init port\n");
@@ -1105,20 +1170,55 @@ static int setup_typec(void)
 int board_usb_init(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	struct udevice *dev;
+	char dr_mode[32] = "";
 
-	debug("board_usb_init %d, type %d\n", index, init);
+	debug("USB%d: %s init.\n", index, (init)?"otg":"host");
 
-	imx8m_usb_power(index, true);
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
 
-	if (index == 0) {
-		if (port.i2c_dev) {
-			if (init == USB_INIT_HOST)
-				tcpc_setup_dfp_mode(port_ptr);
-			else
-				tcpc_setup_ufp_mode(port_ptr);
+	/* We need that return for the fake UDC port */
+	if (ret)
+		return 0;
+
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
+
+	/* Handle USB_OTG devices */
+	if (!strcmp(dr_mode, "otg")) {
+		/* Shutdown the previous configuration */
+		imx8m_usb_power(index, false);
+
+		if (tcpc) {
+#ifdef CONFIG_USB_TCPC
+			/*
+			 * first check upstream facing port (ufp)
+			 * for device
+			 * */
+			ret = tcpc_setup_ufp_mode(&port);
+			if(ret)
+				/*
+				 * second check downstream facing port (dfp)
+				 * for usb host
+				 * */
+				ret = tcpc_setup_dfp_mode(&port);
+#endif
 		}
 	}
+
+	/* Handle USB_DEV devices */
+	if (!strcmp(dr_mode, "peripheral")) {
+		if (init != USB_INIT_DEVICE)
+			return 0;
+	}
+
+	/* Handle USB_HOST devices */
+	if (!strcmp(dr_mode, "host")) {
+		if (init != USB_INIT_HOST)
+			return 0;
+	}
+
+	imx8m_usb_power(index, true);
 
 	return ret;
 }
@@ -1126,18 +1226,25 @@ int board_usb_init(int index, enum usb_init_type init)
 int board_usb_cleanup(int index, enum usb_init_type init)
 {
 	int ret = 0;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	struct udevice *dev;
 
-	debug("board_usb_cleanup %d, type %d\n", index, init);
+	debug("USB%d: %s cleanup.\n", index, (init)?"otg":"host");
 
-	if (index == 0) {
-		if (port.i2c_dev) {
-			if (init == USB_INIT_HOST)
-				ret = tcpc_disable_src_vbus(port_ptr);
-		}
+	ret = uclass_get_device_by_seq(UCLASS_USB, index, &dev);
+
+	if (ret)
+		return 0;
+
+	/* Handle USB_OTG devices */
+	if (!strcmp(dev_read_string(dev, "dr_mode"), "otg")) {
+#ifdef CONFIG_USB_TCPC
+		if(tcpc)
+			ret = tcpc_disable_src_vbus(&port);
+#endif
 	}
-
 	imx8m_usb_power(index, false);
+
 	return ret;
 }
 
@@ -1146,24 +1253,36 @@ int board_ehci_usb_phy_mode(struct udevice *dev)
 	int ret = 0;
 	enum typec_cc_polarity pol;
 	enum typec_cc_state state;
-	struct tcpc_port *port_ptr = &port;
+	bool tcpc = (port.i2c_dev != NULL);
+	char dr_mode[32] = "";
 
-	if (port.i2c_dev) {
-		if (dev_seq(dev) == 0) {
+	strcpy(dr_mode,dev_read_string(dev, "dr_mode"));
 
-			tcpc_setup_ufp_mode(port_ptr);
+	/* Handle USB_OTG devices */
+	if (!strcmp(dr_mode, "otg")) {
+		if (tcpc) {
+			tcpc_setup_ufp_mode(&port);
 
-			ret = tcpc_get_cc_status(port_ptr, &pol, &state);
+			ret = tcpc_get_cc_status(&port, &pol, &state);
 			if (!ret) {
 				if (state == TYPEC_STATE_SRC_RD_RA || state == TYPEC_STATE_SRC_RD)
 					return USB_INIT_HOST;
 			}
+			return USB_INIT_DEVICE;
 		}
-
-		return USB_INIT_DEVICE;
+		else
+			return USB_INIT_UNKNOWN;
 	}
-	else
-		return USB_INIT_UNKNOWN;
+
+	/* Handle USB_DEV devices */
+	if (!strcmp(dr_mode, "peripheral"))
+		return USB_INIT_DEVICE;
+
+	/* Handle USB_HOST devices */
+	if (!strcmp(dr_mode, "host"))
+		return USB_INIT_HOST;
+
+	return USB_INIT_UNKNOWN;
 }
 #else
 /*
@@ -1229,6 +1348,14 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 #endif
 
 #ifdef CONFIG_BOARD_LATE_INIT
+
+#ifdef CONFIG_DM_VIDEO
+#define BL_PWM_PAD IMX_GPIO_NR(5, 4)
+static iomux_v3_cfg_t const bl_pwm_pads[] = {
+	IMX8MM_PAD_SPDIF_RX_GPIO5_IO4 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+#endif
+
 /*
  * Use this slot to init some final things before the network is started. The
  * F&S configuration heavily depends on this to set up the board specific
@@ -1238,6 +1365,25 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 
 int board_late_init(void)
 {
+#ifdef CONFIG_DM_VIDEO
+	struct udevice *bl_reg;
+
+	/* Start backlight only if video_link variable is set */
+	if (env_get("video_link")) {
+		/* Set-up backlight. ### TODO: Use pwm-backlight instead */
+		if (regulator_get_by_devname("ldb-bl", &bl_reg) < 0)
+			printf("Cannot find backlight regulator\n");
+		else
+			regulator_set_enable(bl_reg, true);
+
+		/* Use PWM-Pad as GPIO, i.e. set full brightness */
+		imx_iomux_v3_setup_multiple_pads(bl_pwm_pads,
+						 ARRAY_SIZE(bl_pwm_pads));
+		gpio_request(BL_PWM_PAD, "BL_PWM");
+		gpio_direction_output(BL_PWM_PAD, 1);
+	}
+#endif
+
 	/* Remove 'fdtcontroladdr' env. because we are using
 	 * compiled-in version. In this case it is not possible
 	 * to use this env. as saved in NAND flash. (s. readme for fdt control)
@@ -1263,7 +1409,7 @@ int board_late_init(void)
 
 	/* Set mac addresses for corresponding boards */
 	fs_ethaddr_init();
-#ifdef CONFIG_VIDEO_MXS
+#if 0 //###ifdef CONFIG_VIDEO_MXS
 	imx_iomux_v3_setup_multiple_pads (bl_on_pads, ARRAY_SIZE (bl_on_pads));
 	/* backlight off */
 	gpio_request (BL_ON_PAD, "BL_ON");
@@ -1474,10 +1620,25 @@ int board_phy_config(struct phy_device *phydev)
 		phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x100);
 		break;
 	case BT_PICOCOREMX8MMr2:
-		/* Set LED2 for Link, LED1 for Activity */
+		/* Set LED1 for Link, LED1 for Activity */
 		phy_write(phydev, MDIO_DEVAD_NONE,
 			  MIIM_RTL8211F_PAGE_SELECT, 0xd04);
 		phy_write(phydev, MDIO_DEVAD_NONE, 0x10, 0x8360);
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0x0);
+
+		/* Disable CLKOUT*/
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0xa43);
+		reg = phy_read(phydev, MDIO_DEVAD_NONE, 0x19);
+		reg &= ~(1 << 0);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x19, reg);
+		break;
+	case BT_OSM8MM:
+		/* Set LED2 for Link, LED2 for Activity */
+		phy_write(phydev, MDIO_DEVAD_NONE,
+			  MIIM_RTL8211F_PAGE_SELECT, 0xd04);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x10, 0xEC00);
 		phy_write(phydev, MDIO_DEVAD_NONE,
 			  MIIM_RTL8211F_PAGE_SELECT, 0x0);
 
@@ -1600,9 +1761,9 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 
 	/*
 	 * Set linux,cma size depending on RAM size. Keep default (320MB) from
-	 * device tree if < 1GB, increase to 640MB otherwise.
+	 * device tree if <= 1GB, increase to 640MB otherwise.
 	 */
-	if (fs_board_get_cfg_info()->dram_size >= 1023)	{
+	if (fs_board_get_cfg_info()->dram_size > 1024)	{
 		fdt32_t tmp[2];
 
 		tmp[0] = cpu_to_fdt32(0x0);

@@ -415,6 +415,89 @@ static void fs_image_parse_image(unsigned long addr, unsigned int offs,
 	}
 }
 
+static unsigned int fs_image_get_sub_location(unsigned long *addr, unsigned int offs,
+				 unsigned int remaining, const char *type, const char *descr)
+{
+	struct fs_header_v1_0 *fsh = (struct fs_header_v1_0 *)(*addr + offs);
+	unsigned int size;
+	unsigned int target_size = 0;
+
+	offs += FSH_SIZE;
+
+	/* Handle subimages */
+	while ((remaining > 0) && !target_size) {
+		fsh = (struct fs_header_v1_0 *)(*addr + offs);
+		if (fs_image_is_fs_image(fsh)) {
+			size = fs_image_get_size(fsh, false);
+			if (!strcmp(fsh->type, type) && (!descr || !strcmp(fsh->param.descr, descr))) {
+				*addr += offs;
+				return size;
+			}
+			target_size = fs_image_get_sub_location(addr, offs, size, type, descr);
+			size += FSH_SIZE;
+		} else
+			size = remaining;
+
+		offs += size;
+		remaining -= size;
+	}
+
+	return target_size;
+}
+
+static void fs_image_crc_all(unsigned long addr, unsigned int offs,
+				 int level, unsigned int remaining)
+{
+	struct fs_header_v1_0 *fsh = (struct fs_header_v1_0 *)(addr + offs);
+	unsigned int size;
+	bool crc_valid = true;
+	u32 *pcs;
+	char info[MAX_DESCR_LEN + 1];
+	int i;
+
+
+	if (fs_image_check_crc32(fsh) < 0)
+		crc_valid = false;
+
+	pcs = (u32 *)&fsh->type[12];
+
+	/* Show info for this image */
+	printf("%08x ", *pcs);
+	crc_valid ? puts("okay") : puts("fail");
+	puts(" ");
+
+	for (i = 0; i < level; i++)
+		putc(' ');
+
+	if (fsh->type[0]) {
+		memcpy(info, fsh->type, MAX_TYPE_LEN);
+		info[MAX_TYPE_LEN] = '\0';
+		printf(" %s", info);
+	}
+	if ((fsh->info.flags & FSH_FLAGS_DESCR) && fsh->param.descr[0]) {
+		memcpy(info, fsh->param.descr, MAX_DESCR_LEN);
+		info[MAX_DESCR_LEN] = '\0';
+		printf(" (%s)", info);
+	}
+	puts("\n");
+	offs += FSH_SIZE;
+	level++;
+
+	/* Handle subimages */
+	while (remaining > 0) {
+		fsh = (struct fs_header_v1_0 *)(addr + offs);
+		if (fs_image_is_fs_image(fsh)) {
+			size = fs_image_get_size(fsh, false);
+			fs_image_crc_all(addr, offs, level, size);
+			size += FSH_SIZE;
+		} else {
+			size = remaining;
+		}
+		offs += size;
+		remaining -= size;
+	}
+}
+
 /* Update size, flags and padsize, calculate CRC32 if requested */
 static void fs_image_update_header(struct fs_header_v1_0 *fsh,
 				   uint size, uint fsh_flags)
@@ -654,6 +737,21 @@ static int fs_image_get_start_copy(void)
 	return start_copy;
 }
 
+static int fs_image_get_start_copy_uboot(void)
+{
+	int start_copy;
+
+	if (fs_board_get_cfg_info()->flags & CI_FLAGS_SECONDARY_UBOOT)
+		start_copy = 0;
+	else
+		start_copy = 1;
+
+	printf("Booted from %s UBOOT, so starting with copy %d\n",
+	       start_copy ? "Primary" : "Secondary", start_copy);
+
+	return start_copy;
+}
+
 static int fs_image_get_boot_dev(void *fdt, enum boot_device *boot_dev,
 				 const char **boot_dev_name)
 {
@@ -693,7 +791,8 @@ static int fs_image_check_boot_dev_fuses(enum boot_device boot_dev,
 	if (boot_dev_fuses == boot_dev)
 		return 0;		/* Match, no change */
 
-	if (boot_dev_fuses == USB_BOOT)
+	if ((boot_dev_fuses == USB_BOOT)
+	|| (boot_dev_fuses == USB2_BOOT))
 		return 1;		/* Not fused yet */
 
 	printf("Error: New BOARD-CFG wants to boot from %s but board is\n"
@@ -765,8 +864,8 @@ static int fs_image_validate_signed(struct fs_header_v1_0 *fsh)
 	/* Copy to verification address and check signature */
 	debug("Copy 0x%x bytes from 0x%08lx to validation address 0x%08lx\n",
 	      size, (ulong)fsh, (ulong)validate_addr);
-	memcpy(validate_addr, fsh, size);
-	if (fs_image_is_valid_signature(validate_addr)) {
+	memcpy(validate_addr, fsh, size + FSH_SIZE);
+	if (!fs_image_is_valid_signature(validate_addr)) {
 		puts("Error: Invalid signature, refusing to save\n");
 		return -EILSEQ;
 	}
@@ -957,6 +1056,11 @@ static int fs_image_find_board_cfg(unsigned long addr, bool force,
 	err = fs_image_validate(fsh, "NBOOT", arch, addr);
 	if (err)
 		return err;
+	else {
+		if(fs_image_is_signed(fsh)){
+			memcpy((void *)(addr + 0x40), (void *)(addr + 0x80), fsh->info.file_size_low + 0x2000);
+		}
+	}
 
 	/* Look for BOARD-INFO subimage and search for matching BOARD-CFG */
 	cfg = fs_image_find(fsh, "BOARD-INFO", arch);
@@ -1077,7 +1181,7 @@ static int fs_image_load_sub(struct flash_info *fi, uint offs, uint size,
 	 */
 	base_offs = offs & ~chunk_mask;
 	read_pos = offs & chunk_mask;
-	if ((read_pos) && fi->write_pos && (base_offs != fi->base_offs)) {
+	if ((read_pos) && (!fi->write_pos || (base_offs != fi->base_offs))) {
 		err = fs_image_fill_temp(fi, base_offs, lim, flags);
 		if (err)
 			return err;
@@ -1482,7 +1586,7 @@ static int fs_image_save_uboot(struct flash_info *fi, struct region_info *ri)
 	int copy, start_copy;
 
 	failed = 0;
-	start_copy = fs_image_get_start_copy();
+	start_copy = fs_image_get_start_copy_uboot();
 	copy = start_copy;
 	do {
 		printf("\nSaving copy %d to %s:\n", copy, fi->devname);
@@ -2752,6 +2856,21 @@ static int fs_image_write_secondary_table(struct flash_info *fi, int copy,
 
 #endif
 
+static void fs_image_set_spl_secondary_bit(struct region_info *spl_ri, int copy)
+{
+	uint32_t *ivt = *(uint32_t**)(spl_ri->sub);
+
+	uint32_t *spl_csf = ivt + 6;
+	uint32_t *spl_self = ivt + 5;
+	uint32_t offset_csf = *spl_csf - *spl_self;
+
+	//Divide by four, for pointer arithmetic
+	uint32_t *real_csf = ivt + offset_csf/4;
+	uint32_t *copy_addr = real_csf - 1;
+
+	*copy_addr = copy;
+}
+
 /* Save NBOOT and SPL region to MMC */
 static int fs_image_save_nboot_mmc(struct flash_info *fi,
 				   struct region_info *nboot_ri,
@@ -2832,6 +2951,8 @@ static int fs_image_save_nboot_mmc(struct flash_info *fi,
 		printf("\nSaving copy %d to %s:\n", copy, fi->devname);
 		if (fs_image_save_region(fi, copy, nboot_ri))
 			failed |= BIT(copy);
+
+		fs_image_set_spl_secondary_bit(spl_ri, copy);
 
 		if (fs_image_save_region(fi, copy, spl_ri))
 			failed |= BIT(copy);
@@ -3135,7 +3256,7 @@ static int do_fsimage_load(struct cmd_tbl *cmdtp, int flag, int argc,
 	void *fdt;
 	struct sub_info sub;
 	unsigned long addr;
-	bool force;
+	bool force = false;
 	bool load_uboot = false;
 	struct fs_header_v1_0 *nboot_fsh, *board_info_fsh, *board_cfg_fsh;
 	struct flash_info fi;
@@ -3174,7 +3295,7 @@ static int do_fsimage_load(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (fs_image_is_fs_image(nboot_fsh)) {
 		printf("Warning! This will overwrite F&S image at RAM address"
 		       " 0x%lx\n", addr);
-		if (force && !fs_image_confirm())
+		if (!force && !fs_image_confirm())
 			return CMD_RET_FAILURE;
 	}
 
@@ -3710,6 +3831,111 @@ static int do_fsimage_fuse(struct cmd_tbl *cmdtp, int flag, int argc,
 	return CMD_RET_SUCCESS;
 }
 
+/* Load DRAM timings from the boot device (NAND or MMC) to DRAM,
+   look for the CRC and print it out */
+static int do_fsimage_checksum(struct cmd_tbl *cmdtp, int flag, int argc,
+			   char * const argv[])
+{
+	unsigned long addr;
+	unsigned long sub_offset;
+	unsigned int sub_size;
+	struct fs_header_v1_0 *nboot_fsh, *sub_fsh;
+	char *type = NULL;
+	u32 *pcs;
+	const char *descr = NULL;
+	char board_cfg[MAX_DESCR_LEN + 1];
+
+	early_support_index = 0;
+	if ((argc > 1) && (argv[1][0] == '-')) {
+		if (strcmp(argv[1], "-t"))
+			return CMD_RET_USAGE;
+		argv++;
+		argc--;
+
+		if (argc > 1) {
+			type = argv[1];
+			argv++;
+			argc--;
+		}
+		else
+			return CMD_RET_USAGE;
+	}
+
+	if (argc > 1)
+		addr = parse_loadaddr(argv[1], NULL);
+	else
+		addr = get_loadaddr();
+
+	/* Ask for confirmation if there is already an F&S image at addr */
+	nboot_fsh = (struct fs_header_v1_0 *)addr;
+	if (!fs_image_is_fs_image(nboot_fsh)) {
+		printf("No F&S image found at addr 0x%lx\n", addr);
+		return CMD_RET_FAILURE;
+	}
+
+	sub_offset = addr;
+	sub_size = fs_image_get_size(nboot_fsh, false);
+
+	if (type) {
+		if (!strcmp(type, "BOARD-CFG")) {
+			const char *board_id = fs_image_get_board_id();
+			int rev = -1;
+			int i = 0;
+
+			for (i = 0; i < MAX_DESCR_LEN; i++) {
+				board_cfg[i] = board_id[i];
+				if (!board_id[i])
+					break;
+				if (board_id[i] == '.')
+					rev = i;
+			}
+			if (rev >= 0)
+				board_cfg[rev] = '\0';
+
+			descr = board_cfg;
+		}
+
+		if (!strcmp(type, "DRAM-TIMING")) {
+			void *fdt = fs_image_get_cfg_fdt();
+			int offs = fs_image_get_board_cfg_offs(fdt);
+			int rev_offs;
+
+			rev_offs = fs_image_get_board_rev_subnode(fdt, offs);
+
+			descr = fs_image_getprop(fdt, offs, rev_offs,
+						      "dram-timing", NULL);
+		}
+
+		/* Get location of header with type */
+		sub_size = fs_image_get_sub_location(&sub_offset, 0, sub_size, type, descr);
+
+		sub_fsh = (struct fs_header_v1_0 *) sub_offset;
+
+		if (strcmp(sub_fsh->type,type)) {
+			printf("No entry of %s!\n",type);
+			return CMD_RET_FAILURE;
+		}
+
+		if (fs_image_check_crc32(sub_fsh) < 0) {
+			printf("Checksum of %s invalid!\n",type);
+			return CMD_RET_FAILURE;
+		}
+
+		pcs = (u32 *)&sub_fsh->type[12];
+		printf("Checksum[%s] = 0x%x\n",sub_fsh->type,*pcs);
+	}
+	else {
+		printf("Checksums of F&S image at addr 0x%lx\n\n", addr);
+
+		puts("checksum valid type (description)\n"
+			 "------------------------------------------------------------"
+			 "-------------------\n");
+		fs_image_crc_all(sub_offset, 0, 0, sub_size);
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
 /* Subcommands for "fsimage" */
 static struct cmd_tbl cmd_fsimage_sub[] = {
 	U_BOOT_CMD_MKENT(arch, 0, 1, do_fsimage_arch, "", ""),
@@ -3722,6 +3948,7 @@ static struct cmd_tbl cmd_fsimage_sub[] = {
 	U_BOOT_CMD_MKENT(load, 2, 1, do_fsimage_load, "", ""),
 	U_BOOT_CMD_MKENT(save, 4, 0, do_fsimage_save, "", ""),
 	U_BOOT_CMD_MKENT(fuse, 2, 0, do_fsimage_fuse, "", ""),
+	U_BOOT_CMD_MKENT(checksum, 3, 1, do_fsimage_checksum, "", ""),
 };
 
 static int do_fsimage(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -3774,7 +4001,7 @@ static int do_fsimage(struct cmd_tbl *cmdtp, int flag, int argc,
 	return cp->cmd(cmdtp, flag, argc, argv);
 }
 
-U_BOOT_CMD(fsimage, 4, 1, do_fsimage,
+U_BOOT_CMD(fsimage, 5, 1, do_fsimage,
 	   "Handle F&S board configuration and F&S images, e.g. U-Boot, NBOOT",
 	   "arch\n"
 	   "    - Show F&S architecture\n"
@@ -3795,6 +4022,9 @@ U_BOOT_CMD(fsimage, 4, 1, do_fsimage,
 	   "fsimage fuse [-f] [<addr> | stored]\n"
 	   "    - Program fuses according to the current BOARD-CFG.\n"
 	   "      WARNING: This is a one time option and cannot be undone.\n"
+	   "fsimage checksum [-t <type>] [<addr> | stored]\n"
+	   "    - Print the checksum of all headers or <type> if specified.\n"
+	   "      The NBoot first needs to be loaded with \"fsimage load\".\n"
 	   "\n"
 	   "If no addr is given, use loadaddr. Using -f forces the command to\n"
 	   "continue without showing any confirmation queries. This is meant\n"

@@ -33,6 +33,7 @@
 
 #include <asm/sections.h>
 #include <sdp.h>
+#include <linux/delay.h>
 
 #include <asm/mach-imx/boot_mode.h>	/* BOOT_TYPE_* */
 #include "../common/fs_image_common.h"	/* fs_image_*() */
@@ -50,12 +51,14 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BT_PICOCOREMX8MX 0x1
 #define BT_PICOCOREMX8MMr2 0x2
 #define BT_TBS2          0x3
+#define BT_OSM8MM        0x4
 
 static const char *board_names[] = {
 	"PicoCoreMX8MM-LPDDR4",
 	"PicoCoreMX8MM-DDR3L",
 	"PicoCoreMX8MMr2-LPDDR4",
 	"TBS2",
+	"OSM8MM",
 	"(unknown)"
 };
 
@@ -116,6 +119,7 @@ int power_init_board(void)
 		break;
 	case BT_PICOCOREMX8MX:
 	case BT_TBS2:
+	case BT_OSM8MM:
 		setup_i2c(I2C_PMIC_8MX, CONFIG_SYS_I2C_SPEED, 0x7f,
 			  &i2c_pad_info_8mx);
 		ret = power_bd71837_init(I2C_PMIC_8MX);
@@ -143,6 +147,7 @@ int power_init_board(void)
 	{
 	case BT_PICOCOREMX8MM:
 	case BT_PICOCOREMX8MMr2:
+	case BT_OSM8MM:
 		/* increase VDD_DRAM to 0.975v f-*or 3Ghz DDR */
 		pmic_reg_write(p, BD718XX_1ST_NODVS_BUCK_VOLT, 0x83);
 		break;
@@ -178,6 +183,10 @@ static void wdog_init(void)
 	set_wdog_reset(wdog);
 }
 
+#define CARRIER_PWR_EN_PAD IMX_GPIO_NR(4, 27)
+static iomux_v3_cfg_t const carrier_pwr_en_pad =
+	IMX8MM_PAD_SAI2_MCLK_GPIO4_IO27 | MUX_PAD_CTRL(NO_PAD_CTRL);
+
 #define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
 
 static iomux_v3_cfg_t const uart_pads_mm[] = {
@@ -195,6 +204,11 @@ static void config_uart(int board_type)
 {
 	switch (board_type)
 	{
+	case BT_OSM8MM:
+		imx_iomux_v3_setup_pad(carrier_pwr_en_pad);
+		gpio_request(CARRIER_PWR_EN_PAD, "CARRIER_PWR_EN");
+		gpio_direction_output(CARRIER_PWR_EN_PAD, 1);
+		mdelay(1);
 	default:
 	case BT_PICOCOREMX8MM:
 	case BT_PICOCOREMX8MMr2:
@@ -265,6 +279,23 @@ static iomux_v3_cfg_t const emmc_pads[] = {
 	MUX_PAD_CTRL(USDHC_GPIO_PAD_CTRL) | IMX8MM_PAD_NAND_READY_B_GPIO3_IO16,
 };
 
+static iomux_v3_cfg_t const emmc_osm_pads[] = {
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_CLK_USDHC1_CLK,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_CMD_USDHC1_CMD,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA0_USDHC1_DATA0,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA1_USDHC1_DATA1,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA2_USDHC1_DATA2,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA3_USDHC1_DATA3,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA4_USDHC1_DATA4,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA5_USDHC1_DATA5,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA6_USDHC1_DATA6,
+	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_DATA7_USDHC1_DATA7,
+//###	MUX_PAD_CTRL(USDHC_PAD_CTRL) | IMX8MM_PAD_SD1_STROBE_USDHC1_STROBE,
+	MUX_PAD_CTRL(USDHC_GPIO_PAD_CTRL) | IMX8MM_PAD_SD1_STROBE_GPIO2_IO11,
+	/* IMX8MM_PAD_SD1_RESET_B_USDHC1_RESET_B */
+	MUX_PAD_CTRL(USDHC_GPIO_PAD_CTRL) | IMX8MM_PAD_SD1_RESET_B_GPIO2_IO10,
+};
+
 int board_mmc_getcd(struct mmc *mmc)
 {
 	return 1;			/* eMMC always present */
@@ -313,6 +344,11 @@ static int fs_spl_init_boot_dev(enum boot_device boot_dev, const char *type)
 		break;
 #endif
 #ifdef CONFIG_MMC
+	case MMC1_BOOT:
+		imx_iomux_v3_setup_multiple_pads(emmc_osm_pads, ARRAY_SIZE(emmc_osm_pads));
+		init_clk_usdhc(0);
+		mmc_initialize(NULL);
+		break;
 	case MMC3_BOOT:
 		imx_iomux_v3_setup_multiple_pads(emmc_pads, ARRAY_SIZE(emmc_pads));
 		init_clk_usdhc(2);
@@ -447,7 +483,7 @@ void board_init_f(ulong dummy)
 	wdog_init();
 	timer_init();
 
-#if 1
+#if 0
 	/*
 	 * Enable this to have early debug output before BOARD-CFG is loaded
 	 * You have to provide the board type, we do not know it yet
@@ -504,8 +540,8 @@ void board_init_f(ulong dummy)
 #ifdef CONFIG_FS_SPL_MEMTEST_COMMON
 void dram_test(void)
 {
-	void *fdt = fs_image_get_cfg_addr(false);
-	int offs = fs_image_get_cfg_offs(fdt);
+	void *fdt = fs_image_get_cfg_fdt();
+	int offs = fs_image_get_board_cfg_offs(fdt);
 	int rev_offs = fs_image_get_board_rev_subnode(fdt, offs);
 	unsigned long dram_size = fs_image_getprop_u32(fdt, offs, rev_offs, 0,
 						       "dram-size", 0x400);

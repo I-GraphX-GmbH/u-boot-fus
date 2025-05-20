@@ -19,8 +19,12 @@
 #include <asm/arch/sys_proto.h>		/* is_mx6*() */
 #include <linux/delay.h>
 #include <linux/mtd/rawnand.h>		/* struct mtd_info */
+#include <dm/uclass.h>				/* uclass_get_device() */
 #include "fs_board_common.h"		/* Own interface */
 #include "fs_mmc_common.h"
+#ifdef CONFIG_FS_SELFTEST
+#include "fs_dram_test.h"
+#endif
 #include <fuse.h>			/* fuse_read() */
 #include <update.h>			/* enum update_action */
 
@@ -37,6 +41,11 @@ static char fs_sys_prompt[32];
 
 /* Store a pointer to the current board info */
 static const struct fs_board_info *current_bi;
+
+#ifdef CONFIG_FS_SELFTEST
+/* Store DRAM test result for bdinfo */
+static char dram_result[64] = "FAILED (Not run)";
+#endif
 
 /* ------------- Functions using fs_nboot_args ----------------------------- */
 
@@ -195,7 +204,7 @@ const char *fs_board_get_nboot_version(void)
 /* Set RAM size; optee will be subtracted in dram_init() */
 int board_phys_sdram_size(phys_size_t *size)
 {
-	*size = fs_board_get_cfg_info()->dram_size << 20;
+	*size = (phys_size_t)fs_board_get_cfg_info()->dram_size << 20;
 
 	return 0;
 }
@@ -283,6 +292,10 @@ enum update_action board_check_for_recover(void)
 		}
 	}
 
+	/* Skip check for update when going for fastboot */
+	if (is_boot_from_usb())
+		return UPDATE_ACTION_NONE;
+
 	return UPDATE_ACTION_UPDATE;
 }
 #endif /* CONFIG_CMD_UPDATE */
@@ -311,6 +324,11 @@ void fs_board_init_common(const struct fs_board_info *board_info)
 
 	/* Prepare the command prompt */
 	sprintf(fs_sys_prompt, "%s # ", board_info->name);
+
+#ifdef CONFIG_IMX_TMU
+	/* Initialize thermal sensor */
+	uclass_get_device(UCLASS_THERMAL, 0, NULL);
+#endif
 }
 
 #ifdef CONFIG_BOARD_LATE_INIT
@@ -371,6 +389,11 @@ void fs_board_late_init_common(const char *serial_name)
 	if (conflict)
 		puts(" *** Warning - not compatible with current U-Boot!");
 	putc('\n');
+
+#ifdef CONFIG_FS_SELFTEST
+	/* Save dram_result for bdinfo */
+	fs_test_ram(dram_result);
+#endif
 
 	/* Set sercon variable if not already set */
 	envvar = env_get("sercon");
@@ -475,10 +498,17 @@ void fs_board_late_init_common(const char *serial_name)
 	}
 
 	/* Set some variables with a direct value */
+#if defined(CONFIG_FS_SELFTEST)
+	env_set("bootdelay", "0");
+	env_set("updatecheck", "");
+	env_set("installcheck", "");
+	env_set("recovercheck", "");
+#else
 	setup_var("bootdelay", current_bi->bootdelay, 0);
 	setup_var("updatecheck", current_bi->updatecheck, 0);
 	setup_var("installcheck", current_bi->installcheck, 0);
 	setup_var("recovercheck", current_bi->recovercheck, 0);
+#endif
 #ifndef CONFIG_ARCH_MX7ULP
 	setup_var("mtdids", MTDIDS_DEFAULT, 0);
 	setup_var("partition", MTDPART_DEFAULT, 0);
@@ -673,6 +703,14 @@ char *get_sys_prompt(void)
 	return fs_sys_prompt;
 }
 
+#ifdef CONFIG_FS_SELFTEST
+/* Return dram_result for bdinfo */
+char *get_dram_result(void)
+{
+	return dram_result;
+}
+#endif
+
 #endif /* ! CONFIG_SPL_BUILD */
 
 /* ============= Functions also available in SPL =========================== */
@@ -684,6 +722,7 @@ struct boot_dev_name {
 
 const struct boot_dev_name boot_dev_names[] = {
 	{USB_BOOT,  "USB"},
+	{USB2_BOOT, "USB2"},
 	{NAND_BOOT, "NAND"},
 	{MMC1_BOOT, "MMC1"},
 	{MMC2_BOOT, "MMC2"},
@@ -888,6 +927,8 @@ enum boot_device fs_board_get_boot_dev_from_fuses(void)
 	force_alt_usdhc = val & BOOT_CFG_FORCE_ALT_USDHC;
 	alt = (val & BOOT_CFG_ALT_SEL_MASK) >> BOOT_CFG_ALT_SEL_SHIFT;
 	switch ((val & BOOT_CFG_DEVSEL_MASK) >> BOOT_CFG_DEVSEL_SHIFT) {
+	case 0x1: // USB0 / USB1
+		boot_dev = get_boot_device();
 	case 0x2: // eMMC(SD3)
 		boot_dev = MMC3_BOOT;
 		if (force_alt_usdhc)

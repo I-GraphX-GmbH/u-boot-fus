@@ -422,8 +422,7 @@ bool fs_image_is_valid_signature(struct fs_header_v1_0 *fsh)
 
 	/* Check IVT integrity */
 	start = fs_image_get_ivt_info(fsh, &size);
-	if (!start || (start != fsh) || ((ulong)(ivt->self) != (ulong)ivt)
-	    || (size != fs_image_get_size(fsh, true)))
+	if (!start || (start != fsh) || ((ulong)(ivt->self) != (ulong)ivt))
 		return false;
 
 #ifdef CONFIG_FS_SECURE_BOOT
@@ -448,7 +447,7 @@ bool fs_image_is_valid_signature(struct fs_header_v1_0 *fsh)
 
 		/* Check signature */
 		err = imx_hab_authenticate_image((u32)(ulong)fsh,
-						 size, FSH_SIZE);
+				fs_image_get_size(fsh, true), FSH_SIZE);
 
 		/* Bring back the saved values */
 		fsh->info.file_size_high = file_size_high;
@@ -716,6 +715,25 @@ bool fs_image_is_secondary(void)
 	return false;
 }
 
+bool fs_image_is_secondary_uboot(void)
+{
+	struct fs_header_v1_0 *fsh = fs_image_get_cfg_addr();
+	u8 *size = (u8 *)&fsh->info.file_size_low;
+
+	/*
+	 * Similar to the SPL, we use the "file_size_high" field of the
+	 * BOARD-CFG as an indicator that we booted the UBoot from the
+	 * secondary partition.
+	 */
+	if (size[6]) {
+		size[6] = 0;
+		return true;
+	}
+
+	printf("UBoot is secondary\n");
+	return false;
+}
+
 /*
  * Return address of board configuration in OCRAM; search for it if not
  * available at expected place. This function is called early in boot_f phase
@@ -978,6 +996,19 @@ void fs_image_mark_secondary(void)
 	 * U-Boot has to reset this byte to 0 before validating the BOARD-CFG.
 	 */
 	size[7] = 0xff;
+}
+
+/* Mark BOARD_CFG to tell U-Boot that we are running on Secondary UBoot */
+void fs_image_mark_secondary_uboot(void)
+{
+	struct fs_header_v1_0 *fsh = fs_image_get_cfg_addr();
+	u8 *size = (u8 *)&fsh->info.file_size_low;
+
+	/*
+	 * Like with fs_image_mark_secondary() we use a field in the BOARD-CFG
+	 * to indicate that we boot an UBoot from the secondary partition.
+	 */
+	size[6] = 0xff;
 }
 
 /* Relocate dram_timing_info structure and initialize DRAM */

@@ -564,7 +564,7 @@ int vidconsole_put_string(struct udevice *dev, const char *str)
 	return 0;
 }
 
-static void vidconsole_putc(struct stdio_dev *sdev, const char ch)
+static void vidconsole_putc(const struct stdio_dev *sdev, const char ch)
 {
 	struct udevice *dev = sdev->priv;
 	int ret;
@@ -583,7 +583,7 @@ static void vidconsole_putc(struct stdio_dev *sdev, const char ch)
 	}
 }
 
-static void vidconsole_puts(struct stdio_dev *sdev, const char *s)
+static void vidconsole_puts(const struct stdio_dev *sdev, const char *s)
 {
 	struct udevice *dev = sdev->priv;
 	int ret;

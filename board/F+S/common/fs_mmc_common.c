@@ -175,11 +175,9 @@ static void fs_mmc_get_env_info(struct mmc *mmc, struct cfg_info *cfg)
 	int layout;
 	const char *layout_name;
 	uint boot_hwpart;
+	static uint boot_hwpart_pre = 7;
 	unsigned int align;
 	int err;
-
-	if (cfg->flags & CI_FLAGS_HAVE_ENV)
-		return;
 
 	/*
 	 * To find the environment location, we must access the BOARD-CFG in
@@ -214,12 +212,22 @@ static void fs_mmc_get_env_info(struct mmc *mmc, struct cfg_info *cfg)
 	 * correct environment and after a restart the old environment is
 	 * available again.
 	 */
+
+	boot_hwpart = (mmc->part_config >>3) & PART_ACCESS_MASK;
+
+	if (boot_hwpart > 2)
+		boot_hwpart = 0;
+
+	/* If boot_hwpart changed, get the new layout even if we already have environments! */
+	if (boot_hwpart_pre == boot_hwpart) {
+		if (cfg->flags & CI_FLAGS_HAVE_ENV)
+			return;
+	}
+	boot_hwpart_pre = boot_hwpart;
+
 	fdt = fs_image_get_cfg_fdt();
 	offs = fs_image_get_nboot_info_offs(fdt);
 	align = mmc_get_blk_desc(mmc)->blksz;
-	boot_hwpart = (mmc->part_config >>3) & PART_ACCESS_MASK;
-	if (boot_hwpart > 2)
-		boot_hwpart = 0;
 
 	layout_name = boot_hwpart ? "emmc-boot" : "sd-user";
 	layout = fdt_subnode_offset(fdt, offs, layout_name);

@@ -159,20 +159,21 @@ int splash_display(void)
 	int x = 0, y = 0, ret;
 
 	s = env_get("splashimage");
-	if (!s)
-		return -EINVAL;
-
-	addr = simple_strtoul(s, NULL, 16);
-	ret = splash_screen_prepare();
-	if (ret)
-		return ret;
+	if (!s) {
+		addr = (ulong)bmp_logo_bitmap;
+	} else {
+		addr = simple_strtoul(s, NULL, 16);
+		ret = splash_screen_prepare();
+		if (ret)
+			return ret;
+	}
 
 	splash_get_pos(&x, &y);
 
 	ret = bmp_display(addr, x, y);
 
 	/* Skip banner output on video console if the logo is not at 0,0 */
-	if (x || y)
+	if (s || x || y)
 		goto end;
 
 #if defined(CONFIG_DM_VIDEO) && !defined(CONFIG_HIDE_LOGO_VERSION)

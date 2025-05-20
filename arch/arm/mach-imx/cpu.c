@@ -234,7 +234,16 @@ int print_cpuinfo(void)
 		break;
 	}
 	printf("CPU:   %s temperature grade (%dC to %dC)", temp, minc, maxc);
-#if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_IMX_TMU)
+
+/*
+ * 18.09.2024 KM: Further testing needed!
+ * In tests the early call of the uclass_get_device() did not
+ * create any problems for the device-tree. For now, we take
+ * the early call out, but this needs to be evaluated for
+ * newer U-Boot versions. (fsimx93 already uses this call)
+ * We initialize the thermal sensor in board_init().
+ */
+#if defined(CONFIG_IMX_THERMAL)// || defined(CONFIG_IMX_TMU)
 	{
 		struct udevice *thermal_dev;
 		int cpu_tmp;

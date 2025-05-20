@@ -178,6 +178,19 @@ int setup_bdinfo(void);
 int cpu_secondary_init_r(void);
 
 /**
+ * board_video_prepare() - Board specific video initialization
+ *
+ * Have a board specific initialization for video devices. This is necessary
+ * because in board_init(), the environment is not yet available and in
+ * board_late_init(), it is too late.
+ *
+ * It is called during the generic post-relocation init sequence.
+ *
+ * Return: 0 if OK
+ */
+int board_video_init(void);
+
+/**
  * pci_ep_init() - Initialize pci endpoint devices
  *
  * It is called during the generic post-relocation init sequence.

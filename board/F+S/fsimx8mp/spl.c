@@ -50,22 +50,28 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BT_PICOCOREMX8MPr2 0x1
 #define BT_ARMSTONEMX8MP 0x2
 #define BT_EFUSMX8MP 0x3
+#define BT_FSSMMX8MP 0x4
 
 static const char *board_names[] = {
 	"PicoCoreMX8MP",
 	"PicoCoreMX8MPr2",
 	"armStoneMX8MP",
 	"efusMX8MP",
+	"FSSMMX8MP",
 	"(unknown)"
 };
 
-static unsigned int board_type;
+static int board_type = -1;
 static const char *board_name;
 static const char *board_fdt;
 static enum boot_device used_boot_dev;	/* Boot device used for NAND/MMC */
 static bool boot_dev_init_done;
 static unsigned int uboot_offs;
+static unsigned int uboot_offs_redundant; /* offset of redundant UBoot */
+static unsigned int uboot_part;
+static unsigned int uboot_part_redundant; /* partition of redundant UBoot */
 static bool secondary;			/* 0: primary, 1: secondary SPL */
+static int uboot_try; /* 0: first try, 1: second try */
 static bool usb_initialized = false;
 
 #ifdef CONFIG_POWER
@@ -105,6 +111,7 @@ int power_init_board(void)
 	struct i2c_pads_info *pi2c_pad_info;
 	unsigned int bus;
 
+
 	switch (board_type)
 	{
 	default:
@@ -115,6 +122,7 @@ int power_init_board(void)
 		pi2c_pad_info = &i2c_pad_info_8mp;
 		break;
 	case BT_EFUSMX8MP:
+	case BT_FSSMMX8MP:
 		bus = 5;
 		pi2c_pad_info = &i2c_pad_info_efusmx8mp;
 		break;
@@ -146,6 +154,16 @@ int power_init_board(void)
 	/* Kernel uses OD/OD freq for SOC */
 	/* To avoid timing risk from SOC to ARM,increase VDD_ARM to OD voltage 0.95v */
 	pmic_reg_write(p, PCA9450_BUCK2OUT_DVS0, 0x1C);
+
+	if (board_type == BT_FSSMMX8MP) {
+		void *fdt = fs_image_get_cfg_fdt();
+		int offs = fs_image_get_board_cfg_offs(fdt);
+		int rev_offs = fs_image_get_board_rev_subnode(fdt, offs);
+		if(fs_image_getprop(fdt, offs, rev_offs, "have-temp", NULL)){
+			/* Force I2C level translator enable, if we have temp sensors */
+			pmic_reg_write(p, PCA9450_CONFIG2, 0x3);
+		}
+	}
 
 	/* set WDOG_B_CFG to cold reset */
 	pmic_reg_write(p, PCA9450_RESET_CTRL, 0xA1);
@@ -179,6 +197,11 @@ static iomux_v3_cfg_t const uart_pads_mp[] = {
 static iomux_v3_cfg_t const uart_pads_efusmx8mp[] = {
 	MX8MP_PAD_SAI2_RXC__UART1_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
 	MX8MP_PAD_SAI2_RXFS__UART1_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart_pads_fssmmx8mp[] = {
+	MX8MP_PAD_UART2_RXD__UART2_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX8MP_PAD_UART2_TXD__UART2_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
 #define UART_AUTOMOD_CTRL (PAD_CTL_DSE2 | PAD_CTL_PUE | PAD_CTL_PE)
@@ -226,6 +249,11 @@ static void config_uart(int bt)
 		clk_index = 0;
 		pad_list_count = ARRAY_SIZE(uart_pads_efusmx8mp);
 		break;
+	case BT_FSSMMX8MP:
+		pad_list = uart_pads_fssmmx8mp;
+		clk_index = 1;
+		pad_list_count = ARRAY_SIZE(uart_pads_fssmmx8mp);
+		break;
 	}
 
 	/* Setup UART pads */
@@ -247,6 +275,7 @@ ulong board_serial_base(void)
 	case BT_PICOCOREMX8MP:
 	case BT_PICOCOREMX8MPr2:
 	case BT_ARMSTONEMX8MP:
+	case BT_FSSMMX8MP:
 	default:
 		break;
 	}
@@ -366,6 +395,7 @@ static int fs_spl_init_boot_dev(enum boot_device boot_dev, const char *type)
 		//### TODO: Also have setups for MMC1_BOOT and MMC2_BOOT
 #endif
 	case USB_BOOT:
+	case USB2_BOOT:
 		/* Nothing to do */
 		return -ENODEV;
 
@@ -377,6 +407,18 @@ static int fs_spl_init_boot_dev(enum boot_device boot_dev, const char *type)
 
 	boot_dev_init_done = true;
 	return 0;
+}
+
+void mmc_get_parts()
+{
+	if(uboot_offs == uboot_offs_redundant){
+		uboot_part = 1;
+		uboot_part_redundant = 2;
+	}
+	else{
+		uboot_part = 0;
+		uboot_part_redundant = 0;
+	}
 }
 
 /* Do the basic board setup when we have our final BOARD-CFG */
@@ -441,12 +483,35 @@ static void basic_init(const char *layout_name)
 		layout = fdt_subnode_offset(fdt, offs, layout_name);
 		uboot_offs = fdt_getprop_u32_default_node(fdt, layout, index,
 							  "uboot-start", 0);
+		uboot_offs_redundant = fdt_getprop_u32_default_node(
+					fdt, layout, index + 1,"uboot-start",
+								uboot_offs);
+
+		/* Only relevant for mmc, but does no harm for Nand */
+		mmc_get_parts();
 	}
 
 	/* We need to have the boot device pads active when starting U-Boot */
 	fs_spl_init_boot_dev(boot_dev, "BOARD-CFG");
 
 	power_init_board();
+}
+
+int spl_mmc_emmc_boot_partition(struct mmc *mmc)
+{
+	int part = 0;
+
+	if(uboot_try == 0)
+		part = uboot_part;
+	else
+		part = uboot_part_redundant;
+
+	return part;
+}
+
+int check_if_secondary()
+{
+	return is_imx8m_running_secondary_boot_image();
 }
 
 void board_init_f(ulong dummy)
@@ -490,6 +555,7 @@ void board_init_f(ulong dummy)
 			secondary = true;
 	}
 #endif
+	secondary = check_if_secondary();
 
 	/* Try loading from the current boot dev. If this fails, try USB. */
 	boot_dev = get_boot_device();
@@ -563,6 +629,10 @@ void spl_board_init(void)
 		bl_on_pad = MX8MP_PAD_GPIO1_IO01__GPIO1_IO01 | MUX_PAD_CTRL(NO_PAD_CTRL);
 		bl_on_gpio = IMX_GPIO_NR(1, 1);
 		break;
+	case BT_FSSMMX8MP:
+		bl_on_pad = MX8MP_PAD_SAI1_RXFS__GPIO4_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL);
+		bl_on_gpio = IMX_GPIO_NR(4, 0);
+		break;
 	}
 
 	imx_iomux_v3_setup_pad(bl_on_pad);
@@ -597,7 +667,15 @@ void spl_board_init(void)
 /* Return the sector number where U-Boot starts in eMMC (User HW partition) */
 unsigned long spl_mmc_get_uboot_raw_sector(struct mmc *mmc)
 {
-	return uboot_offs / 512;
+	int offs;
+
+	if(uboot_try == 0)
+		offs = uboot_offs / 512;
+	else
+		offs = uboot_offs_redundant / 512;
+
+	uboot_try++;
+	return offs;
 }
 
 #if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_IMX8M)
@@ -690,35 +768,39 @@ int board_usb_init(int index, enum usb_init_type init)
 	if(usb_initialized)
 		return 0;
 
-	if (index == 0 && init == USB_INIT_DEVICE)
-		/* usb host only */
-		return 0;
-
 	debug("USB%d: %s init.\n", index, (init)?"otg":"host");
 
-	if (!usb_initialized)
-		imx8m_usb_power(index, true);
+	imx8m_usb_power(index, true);
 
-	if (index == 1 && init == USB_INIT_DEVICE) {
-		if (!usb_initialized) {
-			usb_initialized = true;
-			switch (board_type)
-			{
-			case BT_EFUSMX8MP:
-				imx_iomux_v3_setup_pad(usb2_oc_pad);
-				//gpio_request(USB2_OC, "usb2_oc");
-				//gpio_direction_output(USB2_OC, 1);
-				/* Enable otg power */
-				imx_iomux_v3_setup_pad(usb2_pwr_pad);
-				//gpio_request(USB2_PWR_EN, "usb2_pwr");
-				//gpio_direction_output(USB2_PWR_EN, 0);
-				break;
-			default:
-				break;
-			}
-			dwc3_nxp_usb_phy_init(&dwc3_device_data);
-			return dwc3_uboot_init(&dwc3_device_data);
+	switch (index) {
+		case 0:
+			dwc3_device_data.base = USB1_BASE_ADDR;
+			dwc3_device_data.index = 0;
+			break;
+		case 1:
+		default:
+			dwc3_device_data.base = USB2_BASE_ADDR;
+			dwc3_device_data.index = 1;
+	}
+
+	if (init == USB_INIT_DEVICE) {
+		usb_initialized = true;
+		switch (board_type)
+		{
+		case BT_EFUSMX8MP:
+			imx_iomux_v3_setup_pad(usb2_oc_pad);
+			//gpio_request(USB2_OC, "usb2_oc");
+			//gpio_direction_output(USB2_OC, 1);
+			/* Enable otg power */
+			imx_iomux_v3_setup_pad(usb2_pwr_pad);
+			//gpio_request(USB2_PWR_EN, "usb2_pwr");
+			//gpio_direction_output(USB2_PWR_EN, 0);
+			break;
+		default:
+			break;
 		}
+		dwc3_nxp_usb_phy_init(&dwc3_device_data);
+		return dwc3_uboot_init(&dwc3_device_data);
 	}
 
 	return 0;
@@ -749,6 +831,32 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 	imx8m_usb_power(index, false);
 
 	return ret;
+}
+
+int board_usb_gadget_port_auto(void)
+{
+	if (board_type != -1) {
+		switch (board_type)
+		{
+		default:
+		case BT_PICOCOREMX8MP:
+		case BT_PICOCOREMX8MPr2:
+		case BT_ARMSTONEMX8MP:
+		case BT_EFUSMX8MP:
+			return 1;
+		case BT_FSSMMX8MP:
+			return 0;
+		}
+	}
+	else {
+	/* If the board_type is not clear yet
+	 * read the boot device from ROM pointer */
+		if (is_usb_boot())
+			return get_boot_device() - USB_BOOT;
+	}
+
+	/* If we arrive here, we have no valid device */
+	return -1;
 }
 #endif
 
@@ -785,6 +893,7 @@ void board_boot_order(u32 *spl_boot_list)
 		spl_boot_list[0] = BOOT_DEVICE_NAND;
 		break;
 	case USB_BOOT:
+	case USB2_BOOT:
 		spl_boot_list[0] = BOOT_DEVICE_BOARD;
 		break;
 	default:

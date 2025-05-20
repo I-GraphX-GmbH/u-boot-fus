@@ -30,5 +30,7 @@ obj-$(CONFIG_FS_ETH_COMMON)	+= fs_eth_common.o
 obj-$(CONFIG_FS_USB_COMMON)	+= fs_usb_common.o
 obj-$(CONFIG_FS_DISP_COMMON)	+= fs_disp_common.o
 obj-$(CONFIG_USB_TCPC)		+= tcpc.o
+obj-$(CONFIG_FS_SELFTEST) += fs_processor_info.o
+obj-$(CONFIG_FS_SELFTEST) += fs_dram_test.o
 endif
 endif

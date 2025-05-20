@@ -14,8 +14,9 @@
 	board-cfg {
 		board-name = "PicoCoreMX8MM-DDR3L";
 
+		/* DRAM: 1GB Insignis B.ICDRAM.21 */
 		dram-type = "ddr3l";
-		dram-timing = "pc-1g1600m2ch2cs";
+		dram-timing = "ddr3l_pc_1g1600m2ch2cs";
 		dram-size = <0x400>;		/* In MiB */
 		dram-chips = <2>;
 

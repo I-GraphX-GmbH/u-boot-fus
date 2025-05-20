@@ -9,7 +9,7 @@ include spl/include/autoconf.mk
 # NBoot version with year and month. Please update for every release. If there
 # needs to be more than one release within a month, add .1, .2, .3, ..., e.g.
 # 2021.03.2 for the third release in March 2021.
-NBOOT_VERSION = 2023.09.1
+NBOOT_VERSION = 2024.06.1
 
 # List of files to add to BOARD-CONFIGS image. The file name depends on the
 # names given in the Selectsoft WaWi for the board and the PCB revision. The
@@ -47,28 +47,47 @@ BOARD_CONFIGS = \
 	PCoreMX8MPr2-FERT5.fs \
 	PCoreMX8MPr2-FERT6.fs \
 	PCoreMX8MPr2-FERT7.fs \
+	PCoreMX8MPr2-FERT8.fs \
 	PCoreMX8MPr2-FERT9.fs \
+	PCoreMX8MPr2-FERT10.fs \
+	PCoreMX8MPr2-FERT11.fs \
+	PCoreMX8MPr2-FERT12.fs \
 	armStoneMX8MP-FERT0.fs \
 	armStoneMX8MP-FERT2.fs \
 	armStoneMX8MP-FERT4.fs \
 	armStoneMX8MP-FERT5.fs \
+	armStoneMX8MP-FERT6.fs \
+	armStoneMX8MP-FERT7.fs \
+	armStoneMX8MP-FERT8.fs \
+	armStoneMX8MP-FERT9.fs \
+	armStoneMX8MP-FERT10.fs \
+	armStoneMX8MP-FERT22.fs \
+	armStoneMX8MP-FERT24.fs \
 	efusMX8MP-FERT3.fs \
 	efusMX8MP-FERT4.fs \
-	efusMX8MP-FERT5.fs
+	efusMX8MP-FERT5.fs \
+	SM8MP-FERT3.fs \
+	SM8MP-FERT4.fs \
+	SM8MP-FERT5.fs
 
 
 # List of DRAM Timings for each DRAM-TYPE
 RT_DDR3L :=
 RT_LPDDR4 := \
+	lpddr4_as_4g1500m2ch2cs_timing.fs \
 	lpddr4_as_2g1600m2ch1cs_timing.fs \
 	lpddr4_as_1g2000m2ch1cs_timing.fs \
 	lpddr4_as_1g1800m2ch1cs_timing.fs \
 	lpddr4_ef_2g1800m2ch1cs_timing.fs \
+	lpddr4_ef_1g1800m2ch1cs_timing.fs \
 	lpddr4_ef_1g2000m2ch1cs_timing.fs \
+	lpddr4_pc_4g1500m2ch2cs_timing.fs \
 	lpddr4_pc_2g1500m2ch1cs_timing.fs \
 	lpddr4_pc_2g1300m2ch1cs_timing.fs \
 	lpddr4_pc_1g1800m2ch1cs_timing.fs \
-	lpddr4_pc_1g1500m2ch1cs_timing.fs
+	lpddr4_pc_1g1500m2ch1cs_timing.fs \
+	lpddr4_sm_2g2000m2ch1cs_timing.fs \
+	lpddr4_sm_1g2000m2ch1cs_timing.fs
 RT_DDR4 :=
 
 # List of DRAM-TYPES for DRAM-SETTINGS image; only add those that have timings
@@ -135,7 +154,7 @@ NXP_LPDDR4 = lpddr4_pmu_train_1d_imem$(DDR_FW_VERSION).bin lpddr4_pmu_train_1d_d
 NXP_DDR4 = ddr4_imem_1d$(NANO).bin ddr4_dmem_1d$(NANO).bin \
 	ddr4_imem_2d$(NANO).bin ddr4_dmem_2d$(NANO).bin
 NXP_ATF = bl31-imx8mp.bin
-NXP_TEE = tee-fsimx8mp.bin
+NXP_TEE = tee-imx8mp.bin
 
 # Add path for NXP firmware images
 NXP_PATH = $(srctree)/board/F+S/NXP-Firmware

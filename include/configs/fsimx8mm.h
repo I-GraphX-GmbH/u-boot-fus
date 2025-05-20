@@ -112,6 +112,8 @@
 
 #define CONFIG_SYS_SERCON_NAME "ttymxc"	/* Base name for serial devices */
 
+#define CONFIG_SYS_BOOTM_LEN		(64 * SZ_1M)
+
 #define CONFIG_SPL_MAX_SIZE		(140 * 1024)
 #define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
@@ -529,7 +531,7 @@
 	".fdt_nfs=setenv fdt nfs ${fdtaddr}"				\
 	" ${serverip}:${rootpath}/${bootfdt}" BOOT_WITH_FDT		\
 	".rootfs_nfs=setenv rootfs root=/dev/nfs"			\
-	" nfsroot=${serverip}:${rootpath}\0"
+	" nfsroot=${serverip}:${rootpath},tcp,v3\0"
 
 /* Generic settings when not booting with updates A/B */
 #define FS_BOOT_SYSTEM
@@ -580,7 +582,7 @@
 	"mtdids=undef\0"						\
 	"mtdparts=undef\0"						\
 	"netdev=eth0\0"							\
-	"mmcdev=" __stringify(CONFIG_SYS_MMC_ENV_DEV) "\0"		\
+	"mmcdev=undef\0"		\
 	".network_off=setenv network\0"					\
 	".network_on=setenv network ip=${ipaddr}:${serverip}"		\
 	":${gatewayip}:${netmask}:${hostname}:${netdev}\0"		\
@@ -715,16 +717,9 @@
 #endif
 
 /* Framebuffer */
-#ifdef CONFIG_VIDEO
+#ifdef CONFIG_DM_VIDEO
 #define CONFIG_VIDEO_MXS
 #define CONFIG_VIDEO_LOGO
-#define CONFIG_SPLASH_SCREEN
-#define CONFIG_SPLASH_SCREEN_ALIGN
-#define CONFIG_CMD_BMP
-#define CONFIG_BMP_16BPP
-#define CONFIG_VIDEO_BMP_RLE8
-#define CONFIG_VIDEO_BMP_LOGO
-#define CONFIG_IMX_VIDEO_SKIP
 #endif
 
 #define CONFIG_OF_SYSTEM_SETUP
